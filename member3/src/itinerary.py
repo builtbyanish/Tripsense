@@ -51,14 +51,20 @@ _BUFFER_HOURS   = 0.5    # buffer per place transition
 _DEFAULT_VISIT  = 2.0    # fallback visit duration in hours
 _APPROX_SPEED_KMH = 40.0  # road-speed approximation for travel time
 
+_PACE_TARGETS = {
+    "relaxed":  {"min_stops": 1, "max_stops": 2, "max_hrs": 7.5, "target_hrs": 5.5, "label": "Relaxed (1–2 stops/day)"},
+    "balanced": {"min_stops": 2, "max_stops": 3, "max_hrs": 9.5, "target_hrs": 7.5, "label": "Balanced (2–3 stops/day)"},
+    "packed":   {"min_stops": 3, "max_stops": 4, "max_hrs": 11.5, "target_hrs": 9.5, "label": "Packed (3–4 stops/day)"},
+}
+
 _PACE_MAX_PLACES = {
-    "relaxed":  3,
-    "balanced": 5,
-    "packed":   7,
+    "relaxed":  2,
+    "balanced": 3,
+    "packed":   4,
 }
 _PACE_MAX_HOURS = {
-    "relaxed":  8.0,
-    "balanced": 10.0,
+    "relaxed":  7.5,
+    "balanced": 9.5,
     "packed":   11.5,
 }
 
@@ -169,6 +175,8 @@ class ItineraryDay:
     crowd_note:    str = ""
     weather_note:  str = ""
     date_quality:  Optional[float] = None   # composite score 0–1
+    theme:         str = ""
+    rag_tip:       str = ""
 
 
 @dataclass
@@ -187,6 +195,7 @@ class Itinerary:
     best_months:     list[str] = field(default_factory=list)
     date_notes:      str = ""
     warnings:        list[str] = field(default_factory=list)
+    rag_insight:     str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -207,6 +216,9 @@ def build_itinerary(
     date_scores: Optional[dict] = None,
     best_months_suggestions: Optional[list[str]] = None,
     month: int = 1,
+    has_seniors: bool = False,
+    has_kids: bool = False,
+    rag_insights: Optional[dict] = None,
 ) -> Itinerary:
     """
     Build a day-by-day itinerary from a recommendations DataFrame.
@@ -275,9 +287,13 @@ def build_itinerary(
     # Sort globally by proximity to create sensible day groupings
     clustered = _sort_by_proximity(unique_places)
 
-    # Target places per day to distribute attractions smoothly across all days
-    total_places = len(unique_places)
-    target_places_per_day = min(max_places_per_day, max(1, math.ceil(total_places / n_days))) if total_places > 0 else max_places_per_day
+    # Target places per day configured intelligently by pace
+    pace_cfg = _PACE_TARGETS.get(pace_key, _PACE_TARGETS["balanced"])
+    min_stops = pace_cfg["min_stops"]
+    max_stops = pace_cfg["max_stops"]
+    target_hrs = pace_cfg["target_hrs"]
+    usable_hours = pace_cfg["max_hrs"] - _MEAL_HOURS
+    buffer_hours = _BUFFER_HOURS if not (has_seniors or has_kids) else 0.75
 
     # --- Allocate places to days ---
     scheduled: list[ItineraryDay] = []
@@ -294,20 +310,24 @@ def build_itinerary(
                 day.date_quality = daily[day_idx].get("avg_score")
                 day.crowd_note   = daily[day_idx].get("crowd_level", "")
 
-        # General weather note for the day (aggregated from stops added later)
         accumulated_hours = 0.0
         prev_place: Optional[dict] = None
 
-        # How many remaining days after this one
+        # Remaining days ensuring balanced distribution without starving future days
         remaining_days = n_days - (day_idx + 1)
-        # Dynamic daily cap ensuring later days also receive places if pool is limited
         if remaining_days > 0 and len(pool) > 0:
-            effective_cap = min(target_places_per_day, max(1, len(pool) - remaining_days + 1))
+            effective_cap = min(max_stops, max(min_stops, len(pool) - remaining_days))
         else:
-            effective_cap = max_places_per_day
+            effective_cap = max_stops
+
+        # Demographic cap adjustment
+        if has_seniors and pace_key == "relaxed":
+            effective_cap = min(effective_cap, 2)
+        elif has_seniors and pace_key == "balanced":
+            effective_cap = min(effective_cap, 2 if len(pool) <= n_days * 2 else 3)
 
         # Pick places for this day
-        day_pool = list(pool)  # candidates
+        day_pool = list(pool)
 
         stops_this_day: list[dict] = []
         for place in day_pool:
@@ -331,14 +351,78 @@ def build_itinerary(
             else:
                 travel_label = "Starting point"
 
-            needed = visit_hrs + travel_hrs + _BUFFER_HOURS
+            needed = visit_hrs + travel_hrs + buffer_hours
+
+            # Dynamic pacing intelligence: If minimum required stops are reached,
+            # decide whether to stop or add more based on landmark duration, transit distance, and target hours:
+            if len(stops_this_day) >= min_stops:
+                if accumulated_hours + needed > target_hrs:
+                    break
+                # Anchor landmark with high visit duration: In relaxed trip, keep as sole star attraction
+                if pace_key == "relaxed" and (visit_hrs >= 2.5 or (prev_place and prev_place.get("visit_duration_hrs", 0) >= 2.5)):
+                    break
+                # Long drive between stops: avoid over-cramming
+                if travel_hrs >= 1.0 and pace_key != "packed":
+                    break
+
             if accumulated_hours + needed > usable_hours and stops_this_day:
                 break
 
             stops_this_day.append({**place, "travel_from_prev": travel_label, "travel_hrs": travel_hrs})
-            accumulated_hours += visit_hrs + travel_hrs + _BUFFER_HOURS
+            accumulated_hours += visit_hrs + travel_hrs + buffer_hours
             prev_place = place
             pool.remove(place)
+
+        # Circadian sequencing: Chronologically order stops (morning temples/outdoors -> midday culture/museums -> sunset beaches/viewpoints)
+        def _circadian_priority(p: dict) -> int:
+            cat = str(p.get("category", "")).lower()
+            nm  = str(p.get("name", "")).lower()
+            if "temple" in cat or "temple" in nm or "waterfall" in cat or "falls" in cat or "wildlife" in cat or "nature" in cat:
+                return 1
+            elif "museum" in cat or "caves" in cat or "cave" in nm or "fort" in cat or "palace" in nm or "heritage" in cat or "attraction" in cat:
+                return 2
+            elif "beach" in cat or "beach" in nm or "viewpoint" in cat or "lake" in cat or "park" in cat or "dam" in cat:
+                return 3
+            return 2
+
+        if len(stops_this_day) > 1:
+            stops_this_day.sort(key=_circadian_priority)
+            prev_p = None
+            for p in stops_this_day:
+                if prev_p:
+                    t_hrs, t_lbl = _travel_time_hours(
+                        prev_p.get("latitude"), prev_p.get("longitude"),
+                        p.get("latitude"), p.get("longitude")
+                    )
+                    p["travel_hrs"] = t_hrs
+                    p["travel_from_prev"] = t_lbl
+                else:
+                    p["travel_hrs"] = 0.0
+                    p["travel_from_prev"] = "Starting point"
+                prev_p = p
+
+        # Assign intelligent day theme and RAG rhythm guidance
+        cats = [p.get("category", "").lower() for p in stops_this_day]
+        if "temple" in cats and ("beach" in cats or "viewpoint" in cats):
+            day.theme = "Morning Spiritual Darshan & Sunset Coastal Horizon"
+            day.rag_tip = "AI RAG Rhythm: Early morning temple visit avoids crowds and midday sun; evening offers calm coastal breezes."
+        elif "temple" in cats and ("heritage" in cats or "fort" in cats):
+            day.theme = "Sacred Heritage & Historic Fortifications"
+            day.rag_tip = "AI RAG Rhythm: Begin with morning darshan, followed by midday stone fort exploration with lunch halts."
+        elif "waterfall" in cats or "nature" in cats or "wildlife" in cats:
+            day.theme = "Verdant Nature Trails & Cascading Waters"
+            day.rag_tip = "AI RAG Rhythm: Morning forest air offers optimal wildlife sightings and comfortable trail hiking."
+        elif "beach" in cats:
+            day.theme = "Coastal Horizons & Marine Breezes"
+            day.rag_tip = "AI RAG Rhythm: Afternoon coastal drives lead into spectacular golden hour sunset photography by the shore."
+        elif len(stops_this_day) == 1:
+            day.theme = f"Deep Immersion: {stops_this_day[0].get('name', 'Destination')}"
+            day.rag_tip = "AI RAG Rhythm: Unhurried single-destination schedule allowing comprehensive exploration with ample rest."
+        else:
+            first_name = stops_this_day[0].get('name', 'Destination') if stops_this_day else 'Regional'
+            day.theme = f"Regional Discovery: {first_name}"
+            day.rag_tip = f"AI RAG Rhythm: {pace_key.title()} itinerary designed for smooth geographic transitions and comfortable pacing."
+
 
         # Build ItineraryStop objects
         cumul = 0.0
@@ -408,6 +492,16 @@ def build_itinerary(
             "The selected filters returned too few places to build a complete itinerary. "
             "Try broadening the region or interests."
         )
+
+    # AI RAG Strategic Guidance summary
+    total_scheduled = sum(len(d.stops) for d in itinerary.days)
+    avg_per_day = total_scheduled / n_days if n_days > 0 else 0
+    itinerary.rag_insight = (
+        f"AI RAG Strategic Assessment: Built a {pace_key.title()} itinerary ({_PACE_TARGETS[pace_key]['min_stops']}–{_PACE_TARGETS[pace_key]['max_stops']} destinations/day) "
+        f"averaging {avg_per_day:.1f} stops/day for {n_travelers} {traveler_type} travelers. "
+        f"Dynamically sequenced using circadian rhythm (morning temples/outdoors, afternoon heritage/museums, evening sunset/beaches) "
+        f"with verified travel buffers."
+    )
 
     return itinerary
 

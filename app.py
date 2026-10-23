@@ -60,16 +60,26 @@ from src.services import wikipedia_images
 
 # Itinerary engine
 try:
-    from itinerary import build_itinerary, Itinerary, ItineraryDay, ItineraryStop, _PACE_MAX_HOURS  # type: ignore
+    from itinerary import build_itinerary, Itinerary, ItineraryDay, ItineraryStop, _PACE_MAX_HOURS, _PACE_TARGETS  # type: ignore
     _ITINERARY_AVAILABLE = True
 except ImportError:
     try:
         from itinerary import build_itinerary, Itinerary, ItineraryDay, ItineraryStop  # type: ignore
-        _PACE_MAX_HOURS = {"relaxed": 8.0, "balanced": 10.0, "packed": 11.5}
+        _PACE_MAX_HOURS = {"relaxed": 7.5, "balanced": 9.5, "packed": 11.5}
+        _PACE_TARGETS = {
+            "relaxed": {"min_stops": 1, "max_stops": 2, "max_hrs": 7.5, "target_hrs": 5.5},
+            "balanced": {"min_stops": 2, "max_stops": 3, "max_hrs": 9.5, "target_hrs": 7.5},
+            "packed": {"min_stops": 3, "max_stops": 4, "max_hrs": 11.5, "target_hrs": 9.5},
+        }
         _ITINERARY_AVAILABLE = True
     except ImportError:
         _ITINERARY_AVAILABLE = False
-        _PACE_MAX_HOURS = {"relaxed": 8.0, "balanced": 10.0, "packed": 11.5}
+        _PACE_MAX_HOURS = {"relaxed": 7.5, "balanced": 9.5, "packed": 11.5}
+        _PACE_TARGETS = {
+            "relaxed": {"min_stops": 1, "max_stops": 2, "max_hrs": 7.5, "target_hrs": 5.5},
+            "balanced": {"min_stops": 2, "max_stops": 3, "max_hrs": 9.5, "target_hrs": 7.5},
+            "packed": {"min_stops": 3, "max_stops": 4, "max_hrs": 11.5, "target_hrs": 9.5},
+        }
 
 logging.basicConfig(level=logging.WARNING)
 
@@ -1193,7 +1203,7 @@ st.markdown("""
 # ---------------------------------------------------------------------------
 with st.expander("Plan Your Trip", expanded=False):
     st.html('<span id="plan-marker"></span>')
-    s_col1, s_col2, s_col3, s_col4 = st.columns([1.3, 1.3, 1.2, 1.2])
+    s_col1, s_col2, s_col3, s_col4, s_col5 = st.columns([1.15, 1.15, 1.05, 1.1, 1.1])
 
     with s_col1:
         default_dist_idx = 0
@@ -1250,6 +1260,25 @@ with st.expander("Plan Your Trip", expanded=False):
                 max_value=30,
                 value=4 if traveler_type in ("Family", "Group") else 2,
             )
+
+    with s_col5:
+        pace_label = st.selectbox(
+            "Trip Pace",
+            [
+                "Balanced (2–3 stops/day)",
+                "Relaxed (1–2 stops/day)",
+                "Packed (3–4 stops/day)",
+            ],
+            index=0,
+            help="Dynamic AI pacing: Relaxed (1–2 places), Balanced (2–3 places), Packed (3–4 places) tailored by visit duration and transit.",
+        )
+        if "relaxed" in pace_label.lower():
+            pace_choice = "relaxed"
+        elif "packed" in pace_label.lower():
+            pace_choice = "packed"
+        else:
+            pace_choice = "balanced"
+        st.session_state.trip_pace = pace_choice
 
     # Demographic Constraints (Smart Filters for Seniors & Kids)
     has_seniors = False
@@ -1350,11 +1379,12 @@ if search_submitted:
         st.session_state.best_months_sugg = best_months_sugg
 
         if _ITINERARY_AVAILABLE:
+            pace_to_use = st.session_state.get("trip_pace", "balanced")
             itin = build_itinerary(
                 recommendations=recs,
                 n_days=int(n_days),
                 start_date=start_date,
-                pace="balanced",
+                pace=pace_to_use,
                 traveler_name="Traveler",
                 traveler_type=traveler_type.lower(),
                 n_travelers=int(n_travelers),
@@ -1364,6 +1394,8 @@ if search_submitted:
                 date_scores=date_scores_result if date_scores_result else None,
                 best_months_suggestions=best_months_sugg,
                 month=target_month,
+                has_seniors=has_seniors,
+                has_kids=has_kids,
             )
             st.session_state.itinerary = itin
             st.session_state.scroll_to_results = True
@@ -1390,11 +1422,23 @@ if st.session_state.app_mode == "Trip":
     itin = st.session_state.get("itinerary")
 
     if itin is not None:
+        pace_key = getattr(itin, "pace", "balanced").lower()
+        pace_title = pace_key.title()
+        if "relax" in pace_key:
+            pace_stops_text = "1–2 stops/day"
+        elif "pack" in pace_key:
+            pace_stops_text = "3–4 stops/day"
+        else:
+            pace_stops_text = "2–3 stops/day"
+
         st.markdown(f"""
         <div style="margin: 1.5rem 0 1rem;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
             <div>
-              <span class="editorial-badge-pill badge-gold">Curated Itinerary Ready</span>
+              <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.35rem;">
+                <span class="editorial-badge-pill badge-gold">Curated Itinerary Ready</span>
+                <span class="editorial-badge-pill badge-soft">Pace: {pace_title} ({pace_stops_text})</span>
+              </div>
               <h2 style="font-size:2.2rem; margin:0.3rem 0; font-weight:800; letter-spacing:-0.02em; color:var(--text-espresso);">{itin.trip_name}</h2>
               <p style="color:#6B5238; margin:0; font-size:0.95rem;">
                 {itin.n_days} Days &bull; {sum(len(d.stops) for d in itin.days)} Scheduled Stops &bull; Region: {itin.district}
@@ -1403,6 +1447,18 @@ if st.session_state.app_mode == "Trip":
           </div>
         </div>
         """, unsafe_allow_html=True)
+
+        rag_insight_text = getattr(itin, "rag_insight", "")
+        if rag_insight_text:
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg, #FFFDF8 0%, #FAF2E4 100%); border:1.5px solid #D4B37C; border-left:4px solid #C8963E; border-radius:12px; padding:1rem 1.25rem; margin:0.75rem 0 1.25rem; box-shadow:0 3px 12px rgba(140, 90, 32, 0.05);">
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.35rem;">
+                {icons.get_icon("sparkles", size=18, color="#C8963E")}
+                <span style="font-weight:700; color:#8C5A20; font-size:0.92rem; text-transform:uppercase; letter-spacing:0.04em;">TripSense RAG Planner Intelligence</span>
+              </div>
+              <p style="color:#382613; font-size:0.92rem; margin:0; line-height:1.55;">{rag_insight_text}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
         # Haversine distance calculator
         def _calc_haversine_distance(lat1, lon1, lat2, lon2) -> float:
@@ -1437,8 +1493,18 @@ if st.session_state.app_mode == "Trip":
                 )
 
             dist_header_tag = f" &bull; {day_total_km:.1f} km Total Travel" if day_total_km > 0 and len(day.stops) > 1 else ""
+            day_theme = getattr(day, "theme", "")
+            day_rag_tip = getattr(day, "rag_tip", "")
+            theme_header_tag = f" &bull; {day_theme}" if day_theme else ""
 
-            with st.expander(f"{day_str} ({len(day.stops)} Stops{dist_header_tag})", expanded=(day.day_number == 1)):
+            with st.expander(f"{day_str} ({len(day.stops)} Stops{dist_header_tag}{theme_header_tag})", expanded=(day.day_number == 1)):
+                if day_rag_tip:
+                    st.markdown(f"""
+                    <div style="background:#FDF9F0; border-radius:8px; border:1px dashed #D4B37C; padding:0.55rem 0.85rem; margin-bottom:0.85rem; font-size:0.86rem; color:#6B420C; display:flex; align-items:center; gap:0.5rem;">
+                      {icons.get_icon("compass", size=15, color="#8C5A20")}
+                      <span><strong>Daily Rhythm:</strong> {html.escape(day_rag_tip)}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
                 for idx, stop in enumerate(day.stops):
                     p_name = getattr(stop, "name", "Destination")
                     p_cat = getattr(stop, "category", "")

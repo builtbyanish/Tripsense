@@ -304,6 +304,21 @@ class TestItineraryGeneration:
         day = itin.days[0]
         assert len(day.stops) <= 3, f"Relaxed pace should have max 3 stops/day, got {len(day.stops)}"
 
+    def test_pace_respected_packed(self, places_df, interactions_df):
+        recs = self._get_recs(places_df, interactions_df, top_n=40)
+        itin = build_itinerary(recs, n_days=1, pace="packed")
+        day = itin.days[0]
+        assert 1 <= len(day.stops) <= 4, f"Packed pace should have 1–4 stops, got {len(day.stops)}"
+
+    def test_rag_intelligence_and_daily_flow(self, places_df, interactions_df):
+        recs = self._get_recs(places_df, interactions_df, top_n=40)
+        itin = build_itinerary(recs, n_days=2, pace="balanced")
+        assert itin.rag_insight, "Itinerary should have an AI RAG strategic assessment"
+        for day in itin.days:
+            if day.stops:
+                assert day.theme, f"Day {day.day_number} should have a theme"
+                assert day.rag_tip, f"Day {day.day_number} should have a circadian flow tip"
+
     def test_empty_recs_produces_empty_days(self):
         itin = build_itinerary(pd.DataFrame(), n_days=2)
         assert len(itin.days) == 2

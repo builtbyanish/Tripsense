@@ -31,6 +31,7 @@ try:
         _sort_by_proximity,
         _PACE_MAX_HOURS,
         _PACE_MAX_PLACES,
+        _PACE_TARGETS,
     )
 except ImportError:
     try:
@@ -50,5 +51,6 @@ except ImportError:
             _sort_by_proximity = _mod._sort_by_proximity
             _PACE_MAX_HOURS = _mod._PACE_MAX_HOURS
             _PACE_MAX_PLACES = _mod._PACE_MAX_PLACES
+            _PACE_TARGETS = getattr(_mod, '_PACE_TARGETS', {})
     except Exception:
         pass
