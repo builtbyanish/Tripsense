@@ -1246,20 +1246,34 @@ with st.expander("Plan Your Trip", expanded=False):
             )
 
     with s_col4:
-        t_sub1, t_sub2 = st.columns(2)
-        with t_sub1:
+        curr_tt = st.session_state.get("plan_traveler_type", "Family")
+        tt_options = ["Solo", "Couple", "Family", "Friends", "Group"]
+        tt_idx = tt_options.index(curr_tt) if curr_tt in tt_options else 2
+
+        if curr_tt == "Solo":
             traveler_type = st.selectbox(
                 "Travellers",
-                ["Solo", "Couple", "Family", "Friends", "Group"],
-                index=2,
+                tt_options,
+                index=tt_idx,
+                key="plan_traveler_type",
             )
-        with t_sub2:
-            n_travelers = st.number_input(
-                "Count",
-                min_value=1,
-                max_value=30,
-                value=4 if traveler_type in ("Family", "Group") else 2,
-            )
+            n_travelers = 1
+        else:
+            t_sub1, t_sub2 = st.columns(2)
+            with t_sub1:
+                traveler_type = st.selectbox(
+                    "Travellers",
+                    tt_options,
+                    index=tt_idx,
+                    key="plan_traveler_type",
+                )
+            with t_sub2:
+                n_travelers = st.number_input(
+                    "Count",
+                    min_value=2 if traveler_type == "Couple" else 1,
+                    max_value=30,
+                    value=4 if traveler_type in ("Family", "Group") else 2,
+                )
 
     with s_col5:
         current_pace = st.session_state.get("trip_pace", "balanced").capitalize()
@@ -1273,7 +1287,6 @@ with st.expander("Plan Your Trip", expanded=False):
         )
         pace_choice = pace_label.lower()
         st.session_state.trip_pace = pace_choice
-        st.caption("1–2 stops  •  2–3 stops  •  3–4 stops")
 
     # Demographic Constraints (Smart Filters for Seniors & Kids)
     has_seniors = False
