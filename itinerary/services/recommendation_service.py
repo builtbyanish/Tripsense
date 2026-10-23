@@ -192,28 +192,33 @@ def _filter_by_suitable(
         if not sub.empty:
             filtered = sub.copy()
 
-    # 2. Senior / elderly accessibility filtering
-    if has_seniors:
-        # Avoid strenuous physical categories (caves, waterfalls, forts requiring hard climbs, rugged nature)
+    # 2. Senior (60+) & Children (<10) High-Terrain / Climbing Safeguards
+    if has_seniors or has_kids:
+        # Exclude high-terrain, steep climbing, and strenuous physical categories
+        # (rocky gorge waterfalls, subterranean steep caves, hilltop forts with long ascents)
         strenuous_categories = {"waterfall", "caves", "fort"}
         if "category" in filtered.columns:
             non_strenuous = filtered[~filtered["category"].str.lower().isin(strenuous_categories)]
             if not non_strenuous.empty:
                 filtered = non_strenuous.copy()
 
-        # Filter out places explicitly requiring heavy adventure
+        # Filter out places explicitly marked for adventure or trekking
         if "suitable_for" in filtered.columns:
-            non_adventure = filtered[~filtered["suitable_for"].str.lower().str.contains("adventure", na=False)]
-            if not non_adventure.empty:
-                filtered = non_adventure.copy()
+            non_adv = filtered[~filtered["suitable_for"].str.lower().str.contains("adventure|trekking|extreme", na=False)]
+            if not non_adv.empty:
+                filtered = non_adv.copy()
 
-    # 3. Young children safety filtering
-    if has_kids:
-        unsafe_for_kids = {"caves"}
-        if "category" in filtered.columns:
-            safe_kids = filtered[~filtered["category"].str.lower().isin(unsafe_for_kids)]
-            if not safe_kids.empty:
-                filtered = safe_kids.copy()
+        # Exclude steep climbing, high terrain, or trekking in name or description
+        steep_regex = r"(?i)(trek|trekking|climb|climbing|cliff|gorge|rock climbing|steep steps)"
+        name_mask = filtered["name"].str.contains(steep_regex, regex=True, na=False)
+        desc_mask = (
+            filtered["description"].str.contains(steep_regex, regex=True, na=False)
+            if "description" in filtered.columns
+            else pd.Series(False, index=filtered.index)
+        )
+        gentle_mask = ~(name_mask | desc_mask)
+        if gentle_mask.any():
+            filtered = filtered[gentle_mask].copy()
 
     return filtered if not filtered.empty else df
 

@@ -1288,14 +1288,34 @@ with st.expander("Plan Your Trip", expanded=False):
         pace_choice = pace_label.lower()
         st.session_state.trip_pace = pace_choice
 
-    # Demographic Constraints (Smart Filters for Seniors & Kids)
+    # Demographic Constraints (Terrain & Age Safety for Seniors & Children across all groups)
     has_seniors = False
     has_kids = False
-    if traveler_type in ("Family", "Group", "Friends"):
+
+    if traveler_type == "Solo":
+        show_age_filters = st.checkbox(
+            "Configure Traveler Age & Terrain Accessibility",
+            value=False,
+            help="Specify age: travelers under 10 or 60+ will automatically avoid high terrain, steep climbs, caves, and rugged trails."
+        )
+        if show_age_filters:
+            solo_age = st.number_input(
+                "Traveler Age",
+                min_value=1,
+                max_value=105,
+                value=28,
+                key="solo_traveler_age",
+                help="Ages under 10 or 60+ will receive gentle, accessible places without steep terrain climbing."
+            )
+            has_seniors = (solo_age >= 60)
+            has_kids = (solo_age < 10)
+            if has_seniors or has_kids:
+                st.info("Gentle Terrain Active: High climbs, steep waterfalls, caves, and rugged trails will be filtered out for safety and ease.")
+    else:
         show_age_filters = st.checkbox(
             "Configure Traveler Ages & Mobility (for Seniors / Children)",
             value=False,
-            help="Check this to enter ages so we can recommend low-walking and senior/child-friendly places."
+            help="Check this to enter member ages so we can recommend gentle terrain, low-walking, and senior/child-friendly places."
         )
         if show_age_filters:
             age_cols = st.columns(min(int(n_travelers), 4))
@@ -1303,7 +1323,7 @@ with st.expander("Plan Your Trip", expanded=False):
             for idx in range(int(n_travelers)):
                 col = age_cols[idx % len(age_cols)]
                 with col:
-                    default_age = 65 if idx == 0 and traveler_type == "Family" else (8 if idx == 1 and traveler_type == "Family" else 30)
+                    default_age = 65 if idx == 0 and traveler_type in ("Family", "Group") else (8 if idx == 1 and traveler_type == "Family" else 30)
                     age_val = st.number_input(
                         f"Age {idx+1}",
                         min_value=1,
@@ -1313,7 +1333,9 @@ with st.expander("Plan Your Trip", expanded=False):
                     )
                     member_ages.append(age_val)
             has_seniors = any(a >= 60 for a in member_ages)
-            has_kids = any(a <= 10 for a in member_ages)
+            has_kids = any(a < 10 for a in member_ages)
+            if has_seniors or has_kids:
+                st.info("Gentle Terrain Active: High climbs, steep waterfalls, caves, and rugged trails will be filtered out for seniors (60+) / kids (<10).")
 
     _, btn_mid, _ = st.columns([1, 1.6, 1])
     with btn_mid:

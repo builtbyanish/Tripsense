@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Optional
@@ -283,6 +284,22 @@ def build_itinerary(
             seen_ids.add(pid)
             unique_places.append(p)
 
+    # Filter out steep high-terrain climbing destinations if seniors (60+) or kids (<10) are traveling
+    if has_seniors or has_kids:
+        strenuous_cats = {"waterfall", "caves", "fort"}
+        steep_pattern = re.compile(r"\b(trek|trekking|climb|climbing|cliff|gorge|rock climbing|steep steps)\b", re.IGNORECASE)
+        gentle_places = []
+        for p in unique_places:
+            cat = str(p.get("category", "")).lower()
+            name = str(p.get("name", ""))
+            desc = str(p.get("description", ""))
+            suit = str(p.get("suitable_for", "")).lower()
+            if cat in strenuous_cats or "adventure" in suit or steep_pattern.search(name) or steep_pattern.search(desc):
+                continue
+            gentle_places.append(p)
+        if gentle_places:
+            unique_places = gentle_places
+
     # --- Geographic clustering: group nearby places ---
     # Sort globally by proximity to create sensible day groupings
     clustered = _sort_by_proximity(unique_places)
@@ -321,9 +338,9 @@ def build_itinerary(
             effective_cap = max_stops
 
         # Demographic cap adjustment
-        if has_seniors and pace_key == "relaxed":
+        if (has_seniors or has_kids) and pace_key == "relaxed":
             effective_cap = min(effective_cap, 2)
-        elif has_seniors and pace_key == "balanced":
+        elif (has_seniors or has_kids) and pace_key == "balanced":
             effective_cap = min(effective_cap, 2 if len(pool) <= n_days * 2 else 3)
 
         # Pick places for this day
@@ -496,11 +513,23 @@ def build_itinerary(
     # AI RAG Strategic Guidance summary
     total_scheduled = sum(len(d.stops) for d in itinerary.days)
     avg_per_day = total_scheduled / n_days if n_days > 0 else 0
+    rag_demographic_note = ""
+    if has_seniors or has_kids:
+        guards = []
+        if has_seniors:
+            guards.append("seniors (60+)")
+        if has_kids:
+            guards.append("young children (<10)")
+        rag_demographic_note = (
+            f" Configured with gentle terrain safeguards for {' & '.join(guards)}: "
+            f"high-altitude climbs, rugged gorge waterfalls, and caves excluded in favor of accessible, scenic landmarks."
+        )
+
     itinerary.rag_insight = (
         f"AI RAG Strategic Assessment: Built a {pace_key.title()} itinerary ({_PACE_TARGETS[pace_key]['min_stops']}–{_PACE_TARGETS[pace_key]['max_stops']} destinations/day) "
         f"averaging {avg_per_day:.1f} stops/day for {n_travelers} {traveler_type} travelers. "
         f"Dynamically sequenced using circadian rhythm (morning temples/outdoors, afternoon heritage/museums, evening sunset/beaches) "
-        f"with verified travel buffers."
+        f"with verified travel buffers.{rag_demographic_note}"
     )
 
     return itinerary

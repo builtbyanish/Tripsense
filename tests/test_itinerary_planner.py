@@ -319,6 +319,22 @@ class TestItineraryGeneration:
                 assert day.theme, f"Day {day.day_number} should have a theme"
                 assert day.rag_tip, f"Day {day.day_number} should have a circadian flow tip"
 
+    def test_senior_and_kids_gentle_terrain_filtering(self, places_df, interactions_df):
+        recs = self._get_recs(places_df, interactions_df, top_n=40)
+        itin = build_itinerary(recs, n_days=2, has_seniors=True, has_kids=True)
+        strenuous_cats = {"waterfall", "caves", "fort"}
+        for day in itin.days:
+            for stop in day.stops:
+                cat = getattr(stop, "category", "").lower()
+                assert cat not in strenuous_cats, f"High-terrain category {cat} should not be assigned to seniors/kids"
+
+    def test_solo_senior_terrain_handling(self, places_df, interactions_df):
+        recs = self._get_recs(places_df, interactions_df, top_n=30)
+        itin = build_itinerary(
+            recs, n_days=2, traveler_type="solo", n_travelers=1, has_seniors=True
+        )
+        assert "gentle terrain safeguards" in itin.rag_insight.lower()
+
     def test_empty_recs_produces_empty_days(self):
         itin = build_itinerary(pd.DataFrame(), n_days=2)
         assert len(itin.days) == 2
