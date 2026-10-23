@@ -1262,23 +1262,18 @@ with st.expander("Plan Your Trip", expanded=False):
             )
 
     with s_col5:
-        pace_label = st.selectbox(
+        current_pace = st.session_state.get("trip_pace", "balanced").capitalize()
+        if current_pace not in ["Relaxed", "Balanced", "Packed"]:
+            current_pace = "Balanced"
+        pace_label = st.select_slider(
             "Trip Pace",
-            [
-                "Balanced (2–3 stops/day)",
-                "Relaxed (1–2 stops/day)",
-                "Packed (3–4 stops/day)",
-            ],
-            index=0,
-            help="Dynamic AI pacing: Relaxed (1–2 places), Balanced (2–3 places), Packed (3–4 places) tailored by visit duration and transit.",
+            options=["Relaxed", "Balanced", "Packed"],
+            value=current_pace,
+            help="Dynamic AI pacing: Relaxed (1–2 stops/day), Balanced (2–3 stops/day), Packed (3–4 stops/day).",
         )
-        if "relaxed" in pace_label.lower():
-            pace_choice = "relaxed"
-        elif "packed" in pace_label.lower():
-            pace_choice = "packed"
-        else:
-            pace_choice = "balanced"
+        pace_choice = pace_label.lower()
         st.session_state.trip_pace = pace_choice
+        st.caption("1–2 stops  •  2–3 stops  •  3–4 stops")
 
     # Demographic Constraints (Smart Filters for Seniors & Kids)
     has_seniors = False
@@ -1498,13 +1493,6 @@ if st.session_state.app_mode == "Trip":
             theme_header_tag = f" &bull; {day_theme}" if day_theme else ""
 
             with st.expander(f"{day_str} ({len(day.stops)} Stops{dist_header_tag}{theme_header_tag})", expanded=(day.day_number == 1)):
-                if day_rag_tip:
-                    st.markdown(f"""
-                    <div style="background:#FDF9F0; border-radius:8px; border:1px dashed #D4B37C; padding:0.55rem 0.85rem; margin-bottom:0.85rem; font-size:0.86rem; color:#6B420C; display:flex; align-items:center; gap:0.5rem;">
-                      {icons.get_icon("compass", size=15, color="#8C5A20")}
-                      <span><strong>Daily Rhythm:</strong> {html.escape(day_rag_tip)}</span>
-                    </div>
-                    """, unsafe_allow_html=True)
                 for idx, stop in enumerate(day.stops):
                     p_name = getattr(stop, "name", "Destination")
                     p_cat = getattr(stop, "category", "")
