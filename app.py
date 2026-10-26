@@ -1514,12 +1514,12 @@ if st.session_state.get("scroll_to_results", False):
 def render_hotel_demand_forecasting():
     st.markdown("""
     <div style="margin: 2rem 0 1.25rem;">
-      <span class="editorial-badge-pill badge-gold">Member 1 Hospitality Intelligence</span>
+      <span class="editorial-badge-pill badge-gold">Hotel Price & Room Tracker</span>
       <h2 style="font-size: 2.1rem; font-weight: 800; margin: 0.35rem 0 0.4rem; letter-spacing: -0.02em; color: var(--text-espresso); font-family: 'Outfit', sans-serif;">
-        Hotel Demand Forecasting & Pricing near 444 Destinations
+        When is the Best Time to Book Your Hotel?
       </h2>
-      <p style="color: #6B5238; font-size: 0.95rem; margin: 0; line-height: 1.55;">
-        Supervised time-series machine learning models (Gradient Boosting, Random Forest, Linear Regression) predicting daily room demand, occupancy rates, and dynamic ADR pricing for authentic hotels near all 444 tourist destinations in Andhra Pradesh.
+      <p style="color: #6B5238; font-size: 0.96rem; margin: 0; line-height: 1.55;">
+        Check expected room rush, sell-out warnings, and nightly price changes for verified hotels near all 444 tourist attractions across Andhra Pradesh.
       </p>
     </div>
     """, unsafe_allow_html=True)
@@ -1532,7 +1532,7 @@ def render_hotel_demand_forecasting():
     all_districts = ["All Districts"] + sorted(places_hotel_demand_df["district"].dropna().unique().tolist())
     fc_c1, fc_c2 = st.columns([1.2, 2.0])
     with fc_c1:
-        sel_district = st.selectbox("Filter by District", all_districts, index=0, key="m1_fc_dist")
+        sel_district = st.selectbox("1. Pick District", all_districts, index=0, key="m1_fc_dist")
 
     if sel_district == "All Districts":
         filtered_places_sub = places_hotel_demand_df
@@ -1540,10 +1540,10 @@ def render_hotel_demand_forecasting():
         filtered_places_sub = places_hotel_demand_df[places_hotel_demand_df["district"] == sel_district]
 
     place_list = sorted(filtered_places_sub["place_name"].unique().tolist())
-    def_place_idx = place_list.index("Sri Venkateswara Swamy Vaari Temple") if "Sri Venkateswara Swamy Vaari Temple" in place_list else 0
+    def_place_idx = place_list.index("Talakona Waterfalls") if "Talakona Waterfalls" in place_list else 0
     with fc_c2:
         chosen_place = st.selectbox(
-            f"Select Tourist Destination ({len(place_list)} Places in {sel_district})",
+            f"2. Pick Destination ({len(place_list)} Places in {sel_district})",
             place_list,
             index=def_place_idx,
             key="m1_fc_place"
@@ -1554,25 +1554,11 @@ def render_hotel_demand_forecasting():
 
     if not place_hotels_sub.empty:
         unique_nearby_hotels = place_hotels_sub["hotel_name"].unique().tolist()
-        avg_demand_val = place_hotels_sub["pred_demand"].mean()
-        peak_occ_val = place_hotels_sub["pred_occupancy_pct"].max()
-        peak_rate_val = place_hotels_sub["recommended_price"].max()
-        base_rate_val = place_hotels_sub["base_adr"].min()
 
-        m1, m2, m3, m4 = st.columns(4)
-        with m1:
-            st.metric("Nearby Verified Hotels", f"{len(unique_nearby_hotels)} Stays")
-        with m2:
-            st.metric("Projected Peak Occupancy", f"{peak_occ_val:.1f}%")
-        with m3:
-            st.metric("Avg Daily Demand", f"{avg_demand_val:.1f} rooms/day")
-        with m4:
-            st.metric("Dynamic Price Range", f"₹{base_rate_val:,.0f} – ₹{peak_rate_val:,.0f}")
-
-        # Hotel specific tab or sub-selector if multiple hotels exist near this destination
+        # If multiple hotels near place, let user pick
         if len(unique_nearby_hotels) > 1:
             chosen_nearby_hotel = st.radio(
-                "Select Verified Hotel near this Destination",
+                "3. Verified Accommodations Near Destination",
                 unique_nearby_hotels,
                 horizontal=True,
                 key="m1_nearby_hotel_radio"
@@ -1586,53 +1572,131 @@ def render_hotel_demand_forecasting():
         h_base_price = hotel_spec_sub["base_adr"].iloc[0]
         h_dist_name = hotel_spec_sub["district"].iloc[0]
 
+        # Calculate user-friendly travel insights
+        peak_occ = float(hotel_spec_sub["pred_occupancy_pct"].max())
+        min_price_row = hotel_spec_sub.loc[hotel_spec_sub["recommended_price"].idxmin()]
+        max_price_row = hotel_spec_sub.loc[hotel_spec_sub["recommended_price"].idxmax()]
+
+        # Format dates nicely
+        def _fmt_date_day(d_val):
+            try:
+                return pd.to_datetime(d_val).strftime("%a, %b %d")
+            except Exception:
+                return str(d_val)
+
+        best_day_str = _fmt_date_day(min_price_row["date"])
+        peak_day_str = _fmt_date_day(max_price_row["date"])
+
+        # Availability status
+        if peak_occ >= 90.0:
+            avail_status = "Selling Out Fast"
+            avail_color = "#DC2626"
+            avail_bg = "#FEF2F2"
+            advice_text = "Heavy travel rush expected. Room rates peak on weekend dates — book in advance to lock in normal prices."
+        elif peak_occ >= 75.0:
+            avail_status = "Moderate Demand"
+            avail_color = "#D97706"
+            avail_bg = "#FFFBEB"
+            advice_text = "Good availability for weekday check-ins. Expect weekend rates to rise by 10–20%."
+        else:
+            avail_status = "Plenty of Rooms"
+            avail_color = "#16A34A"
+            avail_bg = "#F0FDF4"
+            advice_text = "Great time to visit! Low crowd levels and best rates available."
+
+        # Plain-English Summary Banner
         st.markdown(f"""
-        <div style="background:#FFFDF8; border:1.5px solid #D4B37C; border-left:4px solid #C8963E; border-radius:12px; padding:0.85rem 1.25rem; margin:0.75rem 0 1rem;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
-            <div>
-              <span class="editorial-badge-pill badge-gold">{html.escape(str(h_tier_badge))}</span>
-              <strong style="color:#2E1B0A; font-size:1.15rem; margin-left:0.4rem;">{html.escape(str(chosen_nearby_hotel))}</strong>
-              <span style="color:#6B5238; font-size:0.88rem; margin-left:0.4rem;">&bull; Near {html.escape(str(chosen_place))} ({html.escape(str(h_dist_name))})</span>
+        <div style="background:{avail_bg}; border:1.5px solid {avail_color}40; border-left:5px solid {avail_color}; border-radius:14px; padding:1.1rem 1.35rem; margin:1rem 0 1.25rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.4rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <span style="background:{avail_color}; color:#FFFFFF; font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:12px; text-transform:uppercase; letter-spacing:0.04em;">
+                {avail_status}
+              </span>
+              <strong style="color:#2E1B0A; font-size:1.15rem;">{html.escape(str(chosen_nearby_hotel))}</strong>
             </div>
-            <div>
-              <span style="font-size:0.85rem; color:#6B5238;">Base Rate: </span>
-              <strong style="font-size:1.1rem; color:#8C5A20;">₹{h_base_price:,.0f}/night</strong>
+            <div style="font-size:0.9rem; color:#6B5238;">
+              Near <strong>{html.escape(str(chosen_place))}</strong> ({html.escape(str(h_dist_name))})
             </div>
+          </div>
+          <p style="color:#2E1B0A; font-size:0.95rem; margin:0 0 0.5rem; line-height:1.5;">
+            {advice_text}
+          </p>
+          <div style="display:flex; gap:1.5rem; flex-wrap:wrap; font-size:0.88rem; color:#4B3621; border-top:1px solid {avail_color}25; padding-top:0.5rem; margin-top:0.35rem;">
+            <div>Lowest Nightly Rate: <strong style="color:#16A34A;">₹{min_price_row['recommended_price']:,.0f}</strong> on {best_day_str}</div>
+            <div>Peak Nightly Rate: <strong style="color:#DC2626;">₹{max_price_row['recommended_price']:,.0f}</strong> on {peak_day_str}</div>
+            <div>Standard Base Rate: <strong>₹{h_base_price:,.0f}</strong>/night</div>
           </div>
         </div>
         """, unsafe_allow_html=True)
 
-        # 7-Day Demand & Dynamic Pricing Table
-        st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:1.02rem; margin:1rem 0 0.4rem;'>7-Day Forward Demand & Dynamic Pricing Schedule (Upcoming 2026 Season)</p>", unsafe_allow_html=True)
-        st.dataframe(hotel_spec_sub[[
-            "date", "pred_demand", "capacity", "pred_occupancy_pct",
-            "demand_level", "price_multiplier", "recommended_price"
-        ]].rename(columns={
-            "date": "Stay Date",
-            "pred_demand": "Predicted Occupied Rooms",
-            "capacity": "Capacity Proxy",
-            "pred_occupancy_pct": "Projected Occupancy (%)",
-            "demand_level": "Demand Surge Tier",
-            "price_multiplier": "Dynamic Multiplier",
-            "recommended_price": "Recommended Dynamic Rate (₹)"
-        }), use_container_width=True, hide_index=True)
+        # 7-Day Visual Availability & Price Cards
+        st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:1.05rem; margin:1.25rem 0 0.5rem;'>Upcoming 7-Day Availability & Price Forecast</p>", unsafe_allow_html=True)
 
-    # Model Benchmark Metrics
-    if not model_metrics_df.empty:
-        st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:1.05rem; margin:1.5rem 0 0.4rem;'>Machine Learning Model Evaluation Benchmark (Test Set: Last 120 Days)</p>", unsafe_allow_html=True)
-        st.dataframe(model_metrics_df, use_container_width=True, hide_index=True)
+        day_cols = st.columns(len(hotel_spec_sub))
+        for idx, (_, r) in enumerate(hotel_spec_sub.iterrows()):
+            if idx < len(day_cols):
+                with day_cols[idx]:
+                    card_dt = _fmt_date_day(r["date"])
+                    c_occ = float(r["pred_occupancy_pct"])
+                    c_price = float(r["recommended_price"])
 
-    # Explainability & Diagnostic Plots
-    st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:1.05rem; margin:1.5rem 0 0.4rem;'>Model Explainability & 7-Day Ahead Forecast Validation</p>", unsafe_allow_html=True)
-    diag_col1, diag_col2 = st.columns(2)
-    shap_path = _APP_ROOT / "member1" / "shap_summary.png"
-    actual_path = _APP_ROOT / "member1" / "forecast_vs_actual.png"
-    with diag_col1:
-        if shap_path.exists():
-            st.image(str(shap_path), caption="Top Demand Drivers: Time-Lags, Indian Holidays, Weekend Surge, AP Seasonality")
-    with diag_col2:
-        if actual_path.exists():
-            st.image(str(actual_path), caption="7-Day Ahead Model Forecast vs. Actual Room Demand on Held-Out Test Window")
+                    if c_occ >= 90.0:
+                        c_badge_bg = "#FEE2E2"
+                        c_badge_fg = "#991B1B"
+                        c_status_label = "Selling Fast"
+                    elif c_occ >= 75.0:
+                        c_badge_bg = "#FEF3C7"
+                        c_badge_fg = "#92400E"
+                        c_status_label = "Moderate"
+                    else:
+                        c_badge_bg = "#DCFCE7"
+                        c_badge_fg = "#166534"
+                        c_status_label = "Quiet / Deal"
+
+                    st.markdown(f"""
+                    <div style="background:#FFFDF9; border:1.5px solid #E6DBCF; border-radius:12px; padding:0.75rem 0.4rem; text-align:center; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+                      <div style="font-weight:700; color:#2E1B0A; font-size:0.84rem; margin-bottom:0.25rem;">{card_dt}</div>
+                      <div style="margin:0.25rem 0;">
+                        <span style="background:{c_badge_bg}; color:{c_badge_fg}; font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:10px;">
+                          {c_status_label} ({c_occ:.0f}%)
+                        </span>
+                      </div>
+                      <div style="font-size:1.1rem; font-weight:800; color:#C8963E; margin-top:0.35rem;">₹{c_price:,.0f}</div>
+                      <div style="font-size:0.7rem; color:#8C5A20; margin-top:0.1rem;">per night</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        # Simple Price Trend Chart
+        st.markdown("<div style='margin-top:1.25rem;'></div>", unsafe_allow_html=True)
+        chart_data = hotel_spec_sub.copy()
+        chart_data["Formatted Date"] = chart_data["date"].apply(_fmt_date_day)
+        chart_df = chart_data.set_index("Formatted Date")[["recommended_price"]]
+        chart_df.columns = ["Expected Nightly Rate (₹)"]
+        st.bar_chart(chart_df, height=220)
+
+    # Collapsed Technical Section for Evaluators & Data Scientists
+    with st.expander("Under the Hood: Machine Learning Models & Technical Evaluation", expanded=False):
+        st.markdown("""
+        <p style="color:#382613; font-size:0.92rem; line-height:1.5; margin-bottom:0.75rem;">
+          TripSense uses <strong>Gradient Boosted Decision Trees (GBDT)</strong> and <strong>Random Forest</strong> models to forecast daily hotel room occupancy.
+          Features include 7, 14, 21, and 28-day historical demand lags, Indian public holidays, weekend arrival spikes, and Andhra Pradesh tourist seasonality.
+        </p>
+        """, unsafe_allow_html=True)
+
+        if not model_metrics_df.empty:
+            st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:0.95rem; margin:0.75rem 0 0.35rem;'>Model Benchmark Comparison (Held-Out Test Window)</p>", unsafe_allow_html=True)
+            st.dataframe(model_metrics_df, use_container_width=True, hide_index=True)
+
+        st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:0.95rem; margin:1rem 0 0.35rem;'>Model Explainability & Forecast Validation</p>", unsafe_allow_html=True)
+        diag_col1, diag_col2 = st.columns(2)
+        shap_path = _APP_ROOT / "member1" / "shap_summary.png"
+        actual_path = _APP_ROOT / "member1" / "forecast_vs_actual.png"
+        with diag_col1:
+            if shap_path.exists():
+                st.image(str(shap_path), caption="Top Demand Drivers (Lags, Holidays, Weekend Surge, Seasonality)")
+        with diag_col2:
+            if actual_path.exists():
+                st.image(str(actual_path), caption="7-Day Ahead Model Predictions vs. Actual Stays")
 
 
 # ===========================================================================
