@@ -1206,7 +1206,7 @@ st.markdown("""
 # ---------------------------------------------------------------------------
 # Floating "Plan Your Trip" Dropdown Menu (Overlapping Hero)
 # ---------------------------------------------------------------------------
-with st.expander("Plan Your Trip", expanded=False):
+with st.expander("Plan Your Trip", expanded=True):
     st.html('<span id="plan-marker"></span>')
     s_col1, s_col2, s_col3, s_col4, s_col5 = st.columns([1.15, 1.15, 1.05, 1.1, 1.1])
 
