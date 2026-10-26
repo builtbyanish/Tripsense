@@ -1114,12 +1114,9 @@ def _load_all_data():
     ri_df = data_service.load_review_insights()
     i_df = data_service.load_interactions()
     hr_df = data_service.load_hotel_reviews()
-    fc_df = data_service.load_demand_forecast()
-    met_df = data_service.load_model_metrics()
-    pr_df = data_service.load_hotel_pricing()
-    return p_df, h_df, w_df, bm_df, ri_df, i_df, hr_df, fc_df, met_df, pr_df
+    return p_df, h_df, w_df, bm_df, ri_df, i_df, hr_df
 
-places_df, hotels_df, weather_df, best_months_df, review_insights_df, interactions_df, hotel_reviews_df, demand_forecast_df, model_metrics_df, hotel_pricing_df = _load_all_data()
+places_df, hotels_df, weather_df, best_months_df, review_insights_df, interactions_df, hotel_reviews_df = _load_all_data()
 
 # Pre-load Wikipedia Image Manifest
 wikipedia_images.load_manifest()
@@ -1357,7 +1354,7 @@ st.markdown("""
   <div class="segmented-pill-box">
 """, unsafe_allow_html=True)
 
-switch_c1, switch_c2, switch_c3 = st.columns([1, 1, 1.2])
+switch_c1, switch_c2 = st.columns([1, 1])
 with switch_c1:
     trip_btn = st.button("Trip — Tourism & Discovery", key="mode_trip_btn", use_container_width=True,
                          type="primary" if st.session_state.app_mode == "Trip" else "secondary")
@@ -1366,17 +1363,10 @@ with switch_c1:
         st.rerun()
 
 with switch_c2:
-    hotel_btn = st.button("Hotel — Stays & Reviews", key="mode_hotel_btn", use_container_width=True,
+    hotel_btn = st.button("Hotel — Stays & Booking", key="mode_hotel_btn", use_container_width=True,
                           type="primary" if st.session_state.app_mode == "Hotel" else "secondary")
     if hotel_btn:
         st.session_state.app_mode = "Hotel"
-        st.rerun()
-
-with switch_c3:
-    forecast_btn = st.button("Hotel Demand Forecast (M1)", key="mode_forecast_btn", use_container_width=True,
-                             type="primary" if st.session_state.app_mode == "Forecast" else "secondary")
-    if forecast_btn:
-        st.session_state.app_mode = "Forecast"
         st.rerun()
 
 st.markdown("""
@@ -1480,81 +1470,6 @@ if st.session_state.get("scroll_to_results", False):
     </script>
     """, height=0)
     st.session_state.scroll_to_results = False
-
-
-# ---------------------------------------------------------------------------
-# Dedicated Renderer: Member 1 Hotel Demand Forecasting & Pricing Intelligence
-# ---------------------------------------------------------------------------
-def render_hotel_demand_forecasting():
-    st.markdown("""
-    <div style="margin: 2.5rem 0 1.25rem;">
-      <span class="editorial-badge-pill badge-gold">Member 1 Hospitality Intelligence</span>
-      <h2 style="font-size: 2.1rem; font-weight: 800; margin: 0.35rem 0 0.4rem; letter-spacing: -0.02em; color: var(--text-espresso); font-family: 'Outfit', sans-serif;">
-        Hotel Demand Forecasting & Dynamic Pricing
-      </h2>
-      <p style="color: #6B5238; font-size: 0.95rem; margin: 0; line-height: 1.55;">
-        Supervised machine learning time-series pipeline (XGBoost, Random Forest, Linear Regression) predicting daily room-night demand, occupancy rate projections, and dynamic price multipliers.
-      </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    f_col1, f_col2 = st.columns([1.2, 1.8])
-    with f_col1:
-        hotel_choice = st.radio("Hotel Type", ["City Hotel", "Resort Hotel"], horizontal=True, key="m1_hotel_choice_view")
-    with f_col2:
-        st.caption("Target: Daily occupied room-nights per hotel property, forecast 7 days ahead without data leakage.")
-
-    if not demand_forecast_df.empty:
-        h_sub = demand_forecast_df[demand_forecast_df["hotel"] == hotel_choice].copy()
-        if not h_sub.empty:
-            avg_dem = h_sub["pred_demand"].mean()
-            peak_occ = h_sub["pred_occupancy_pct"].max()
-            m1, m2, m3, m4 = st.columns(4)
-            with m1:
-                st.metric("Avg Predicted Demand", f"{avg_dem:.1f} rooms/day")
-            with m2:
-                st.metric("Peak Projected Occupancy", f"{peak_occ:.1f}%")
-            with m3:
-                st.metric("Forecast Horizon", "7 Days Ahead")
-            with m4:
-                st.metric("Best Model", "Random Forest / XGB")
-
-            st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:1.05rem; margin:1.25rem 0 0.4rem;'>7-Day Predicted Demand & Occupancy Schedule</p>", unsafe_allow_html=True)
-            st.dataframe(h_sub[["date", "pred_demand", "pred_occupancy_pct"]].rename(columns={
-                "date": "Forecast Date",
-                "pred_demand": "Predicted Occupied Rooms",
-                "pred_occupancy_pct": "Projected Occupancy (%)"
-            }), use_container_width=True, hide_index=True)
-
-    # Model Benchmark Metrics
-    if not model_metrics_df.empty:
-        st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:1.05rem; margin:1.5rem 0 0.4rem;'>Machine Learning Model Evaluation Benchmark (Test Set: Last 120 Days)</p>", unsafe_allow_html=True)
-        st.dataframe(model_metrics_df, use_container_width=True, hide_index=True)
-
-    # Dynamic Pricing Sample
-    if not hotel_pricing_df.empty:
-        st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:1.05rem; margin:1.5rem 0 0.4rem;'>Dynamic Pricing Engine (Demand-Driven ADR Multiplier)</p>", unsafe_allow_html=True)
-        sample_pricing = hotel_pricing_df[hotel_pricing_df["hotel"] == hotel_choice].head(7)
-        st.dataframe(sample_pricing[["date", "demand_level", "base_adr", "price_multiplier", "recommended_price"]].rename(columns={
-            "date": "Date",
-            "demand_level": "Demand Tier",
-            "base_adr": "Base Rate ($)",
-            "price_multiplier": "Pricing Multiplier",
-            "recommended_price": "Recommended Rate ($)"
-        }), use_container_width=True, hide_index=True)
-
-    # Explainability & Diagnostic Plots
-    st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:1.05rem; margin:1.5rem 0 0.4rem;'>Model Explainability (SHAP Values & Forecast Validation)</p>", unsafe_allow_html=True)
-    diag_col1, diag_col2 = st.columns(2)
-    shap_path = _REPO_ROOT / "member1" / "shap_summary.png"
-    actual_path = _REPO_ROOT / "member1" / "forecast_vs_actual.png"
-    with diag_col1:
-        if shap_path.exists():
-            st.image(str(shap_path), caption="SHAP Summary: Top Demand Drivers (Lags, Seasonality, Holidays)")
-    with diag_col2:
-        if actual_path.exists():
-            st.image(str(actual_path), caption="7-Day Ahead Forecast vs. Actual Room Demand")
-
 
 
 # ===========================================================================
@@ -2134,7 +2049,7 @@ if st.session_state.app_mode == "Trip":
 # ===========================================================================
 # VIEW MODE: HOTEL (Stays & Accommodations Matched to Itinerary Places)
 # ===========================================================================
-elif st.session_state.app_mode == "Hotel":
+else:
     itin = st.session_state.get("itinerary")
     recs = st.session_state.get("recs")
 
@@ -2360,15 +2275,6 @@ elif st.session_state.app_mode == "Hotel":
             </div>
             """, unsafe_allow_html=True)
 
-
-    # Also display Member 1 Demand Forecasting at the bottom of Hotel Mode
-    render_hotel_demand_forecasting()
-
-# ===========================================================================
-# VIEW MODE: FORECAST (Dedicated Member 1 Hotel Demand & ML Engine)
-# ===========================================================================
-elif st.session_state.app_mode == "Forecast":
-    render_hotel_demand_forecasting()
 
 # ---------------------------------------------------------------------------
 # Footer
