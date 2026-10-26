@@ -1481,12 +1481,32 @@ if st.session_state.app_mode == "Trip":
         rag_insight_text = getattr(itin, "rag_insight", "")
         if rag_insight_text:
             st.markdown(f"""
-            <div style="background:linear-gradient(135deg, #FFFDF8 0%, #FAF2E4 100%); border:1.5px solid #D4B37C; border-left:4px solid #C8963E; border-radius:12px; padding:1rem 1.25rem; margin:0.75rem 0 1.25rem; box-shadow:0 3px 12px rgba(140, 90, 32, 0.05);">
+            <div style="background:linear-gradient(135deg, #FFFDF8 0%, #FAF2E4 100%); border:1.5px solid #D4B37C; border-left:4px solid #C8963E; border-radius:12px; padding:1rem 1.25rem; margin:0.75rem 0 0.75rem; box-shadow:0 3px 12px rgba(140, 90, 32, 0.05);">
               <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.35rem;">
                 {icons.get_icon("sparkles", size=18, color="#C8963E")}
                 <span style="font-weight:700; color:#8C5A20; font-size:0.92rem; text-transform:uppercase; letter-spacing:0.04em;">TripSense RAG Planner Intelligence</span>
               </div>
               <p style="color:#382613; font-size:0.92rem; margin:0; line-height:1.55;">{rag_insight_text}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Best Travel Dates & Climate Advisory Card
+        date_notes_text = getattr(itin, "date_notes", "")
+        best_months_list = getattr(itin, "best_months", [])
+        if date_notes_text or best_months_list:
+            opt_months_markup = ""
+            if best_months_list:
+                month_pills = " ".join([f'<span class="editorial-badge-pill badge-gold" style="font-size:0.8rem; padding:3px 10px;">{m}</span>' for m in best_months_list])
+                opt_months_markup = f'<div style="margin-top:0.45rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;"><strong style="font-size:0.86rem; color:#8C5A20;">Top Recommended Months:</strong> {month_pills}</div>'
+
+            st.markdown(f"""
+            <div style="background:#FFFDF8; border:1.5px solid #D4B37C; border-left:4px solid #C8963E; border-radius:12px; padding:0.9rem 1.25rem; margin:0.5rem 0 1.25rem; box-shadow:0 2px 10px rgba(140, 90, 32, 0.05);">
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.25rem;">
+                {icons.get_icon("calendar", size=18, color="#C8963E")}
+                <span style="font-weight:700; color:#8C5A20; font-size:0.92rem; text-transform:uppercase; letter-spacing:0.04em;">Best Dates & Climate Advisory</span>
+              </div>
+              <p style="color:#382613; font-size:0.92rem; margin:0; line-height:1.5;">{date_notes_text or 'Seasonality and climate comfort scores evaluated from historical weather and holiday crowd datasets.'}</p>
+              {opt_months_markup}
             </div>
             """, unsafe_allow_html=True)
 
@@ -1526,8 +1546,10 @@ if st.session_state.app_mode == "Trip":
             day_theme = getattr(day, "theme", "")
             day_rag_tip = getattr(day, "rag_tip", "")
             theme_header_tag = f" &bull; {day_theme}" if day_theme else ""
+            day_crowd = getattr(day, "crowd_note", "")
+            crowd_header_tag = f" &bull; Crowd: {day_crowd.title()}" if day_crowd else ""
 
-            with st.expander(f"{day_str} ({len(day.stops)} Stops{dist_header_tag}{theme_header_tag})", expanded=(day.day_number == 1)):
+            with st.expander(f"{day_str} ({len(day.stops)} Stops{dist_header_tag}{theme_header_tag}{crowd_header_tag})", expanded=(day.day_number == 1)):
                 for idx, stop in enumerate(day.stops):
                     p_name = getattr(stop, "name", "Destination")
                     p_cat = getattr(stop, "category", "")
@@ -1574,6 +1596,8 @@ if st.session_state.app_mode == "Trip":
                     )
 
                     dist_badge_markup = f'<span class="editorial-badge-pill badge-gold">{dist_from_prev:.1f} km from {html.escape(prev_stop_name)}</span>' if dist_from_prev > 0 else ""
+                    stop_weather = getattr(stop, "weather_note", "")
+                    weather_badge_markup = f'<span class="editorial-badge-pill badge-soft">{html.escape(stop_weather)}</span>' if stop_weather else ""
 
                     c_img, c_info = st.columns([1.2, 2.2])
                     with c_img:
@@ -1585,6 +1609,7 @@ if st.session_state.app_mode == "Trip":
 <div style="display:flex; gap:0.5rem; margin-bottom:0.45rem; flex-wrap:wrap;">
 <span class="editorial-badge-pill badge-gold">{html.escape(str(p_cat).replace('_',' ').title())}</span>
 <span class="editorial-badge-pill badge-soft">{p_dur:g}h Duration</span>
+{weather_badge_markup}
 {dist_badge_markup}
 </div>
 <h3 style="font-family:'Outfit', sans-serif !important; font-size:1.4rem; margin:0 0 0.35rem; font-weight:800; color:#2E1B0A;">{idx+1}. {html.escape(p_name)}</h3>
