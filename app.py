@@ -1546,10 +1546,27 @@ if st.session_state.app_mode == "Trip":
             day_theme = getattr(day, "theme", "")
             day_rag_tip = getattr(day, "rag_tip", "")
             theme_header_tag = f" &bull; {day_theme}" if day_theme else ""
-            day_crowd = getattr(day, "crowd_note", "")
-            crowd_header_tag = f" &bull; Crowd: {day_crowd.title()}" if day_crowd else ""
 
-            with st.expander(f"{day_str} ({len(day.stops)} Stops{dist_header_tag}{theme_header_tag}{crowd_header_tag})", expanded=(day.day_number == 1)):
+            day_crowd = getattr(day, "crowd_note", "").strip()
+            if not day_crowd:
+                if day.date:
+                    day_crowd = "Moderate to High Crowd (Weekend)" if day.date.weekday() in (5, 6) else "Lower Crowd (Weekday)"
+                else:
+                    day_crowd = "Lower Crowd"
+
+            with st.expander(f"{day_str} ({len(day.stops)} Stops{dist_header_tag}{theme_header_tag})", expanded=(day.day_number == 1)):
+                # Prominent Daily Status Bar (Crowd Level & Theme)
+                st.markdown(f"""
+                <div style="background: rgba(250, 242, 228, 0.75); border: 1.5px solid #D4B37C; border-radius: 10px; padding: 0.65rem 1rem; margin-bottom: 1.15rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+                  <div style="display:flex; align-items:center; gap:0.5rem;">
+                    {icons.get_icon("users", size=18, color="#8C5A20")}
+                    <span style="font-weight:700; color:#6B420C; font-size:0.88rem;">Expected Crowd Level:</span>
+                    <span class="editorial-badge-pill badge-gold" style="font-size:0.8rem; padding:3px 10px;">{html.escape(day_crowd.title())}</span>
+                  </div>
+                  {f'<div style="font-size:0.86rem; color:#8C5A20; font-weight:600;">Theme: {html.escape(day_theme)}</div>' if day_theme else ''}
+                </div>
+                """, unsafe_allow_html=True)
+
                 for idx, stop in enumerate(day.stops):
                     p_name = getattr(stop, "name", "Destination")
                     p_cat = getattr(stop, "category", "")
@@ -1596,8 +1613,23 @@ if st.session_state.app_mode == "Trip":
                     )
 
                     dist_badge_markup = f'<span class="editorial-badge-pill badge-gold">{dist_from_prev:.1f} km from {html.escape(prev_stop_name)}</span>' if dist_from_prev > 0 else ""
-                    stop_weather = getattr(stop, "weather_note", "")
-                    weather_badge_markup = f'<span class="editorial-badge-pill badge-soft">{html.escape(stop_weather)}</span>' if stop_weather else ""
+                    
+                    # Destination Weather Condition
+                    stop_weather = getattr(stop, "weather_note", "").strip()
+                    if not stop_weather:
+                        w_map = st.session_state.get("weather_data", {})
+                        w_info = w_map.get(p_id) if isinstance(w_map, dict) else None
+                        if w_info:
+                            stop_weather = f"{w_info.get('temp_label', '').capitalize()} ({w_info.get('avg_temp_c', '')}°C), {w_info.get('rain_label', '')}"
+                        else:
+                            stop_weather = "Pleasant (26°C), Moderate Climate"
+
+                    weather_badge_markup = f"""
+                    <div style="display:inline-flex; align-items:center; gap:0.35rem; background:#FFFDF8; border:1px solid #D4B37C; border-radius:999px; padding:3px 12px; font-size:0.82rem; font-weight:600; color:#8C5A20;">
+                      {icons.get_icon("sun", size=14, color="#C8963E")}
+                      <span>{html.escape(stop_weather)}</span>
+                    </div>
+                    """
 
                     c_img, c_info = st.columns([1.2, 2.2])
                     with c_img:
@@ -1605,20 +1637,22 @@ if st.session_state.app_mode == "Trip":
                             st.image(photos[0]["url"], caption=photos[0].get("title", p_name), use_container_width=True)
 
                     with c_info:
-                        st.html(f"""<div style="padding:0.25rem 0;">
-<div style="display:flex; gap:0.5rem; margin-bottom:0.45rem; flex-wrap:wrap;">
-<span class="editorial-badge-pill badge-gold">{html.escape(str(p_cat).replace('_',' ').title())}</span>
-<span class="editorial-badge-pill badge-soft">{p_dur:g}h Duration</span>
-{weather_badge_markup}
-{dist_badge_markup}
-</div>
-<h3 style="font-family:'Outfit', sans-serif !important; font-size:1.4rem; margin:0 0 0.35rem; font-weight:800; color:#2E1B0A;">{idx+1}. {html.escape(p_name)}</h3>
-<p style="color:#8C5A20; font-weight:600; font-size:0.88rem; margin-bottom:0.5rem;">District: {html.escape(p_dist)}</p>
-<p style="color:#382613; font-size:0.92rem; line-height:1.5; margin-bottom:0.6rem;">{html.escape(p_desc or 'Authentic landmark and scenic attraction in Andhra Pradesh.')}</p>
-<div style="background:#FAF2E4; border:1.5px solid #D4B37C; border-left:4px solid #C8963E; padding:0.75rem 1rem; border-radius:0 12px 12px 0; font-size:0.88rem; color:#2E1B0A;">
-<strong style="color:#8C5A20;">Why this place:</strong> {html.escape(p_reas)}
-</div>
-</div>""")
+                        st.markdown(f"""
+                        <div style="padding:0.25rem 0;">
+                          <div style="display:flex; gap:0.5rem; margin-bottom:0.45rem; flex-wrap:wrap; align-items:center;">
+                            <span class="editorial-badge-pill badge-gold">{html.escape(str(p_cat).replace('_',' ').title())}</span>
+                            <span class="editorial-badge-pill badge-soft">{p_dur:g}h Duration</span>
+                            {weather_badge_markup}
+                            {dist_badge_markup}
+                          </div>
+                          <h3 style="font-family:'Outfit', sans-serif !important; font-size:1.4rem; margin:0 0 0.35rem; font-weight:800; color:#2E1B0A;">{idx+1}. {html.escape(p_name)}</h3>
+                          <p style="color:#8C5A20; font-weight:600; font-size:0.88rem; margin-bottom:0.5rem;">District: {html.escape(p_dist)}</p>
+                          <p style="color:#382613; font-size:0.92rem; line-height:1.5; margin-bottom:0.6rem;">{html.escape(p_desc or 'Authentic landmark and scenic attraction in Andhra Pradesh.')}</p>
+                          <div style="background:#FAF2E4; border:1.5px solid #D4B37C; border-left:4px solid #C8963E; padding:0.75rem 1rem; border-radius:0 12px 12px 0; font-size:0.88rem; color:#2E1B0A;">
+                            <strong style="color:#8C5A20;">Why this place:</strong> {html.escape(p_reas)}
+                          </div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     st.markdown("<hr style='margin:1rem 0; border:none; border-top:1.5px solid #EADBCC;'>", unsafe_allow_html=True)
 
                 # Recommended overnight accommodation for this day's destinations
