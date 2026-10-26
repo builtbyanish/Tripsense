@@ -37,6 +37,7 @@ import streamlit.components.v1 as components
 # Path & Module Setup
 # ---------------------------------------------------------------------------
 _APP_ROOT = Path(__file__).resolve().parent
+_REPO_ROOT = _APP_ROOT
 import sys
 if str(_APP_ROOT) not in sys.path:
     sys.path.insert(0, str(_APP_ROOT))
@@ -1624,8 +1625,8 @@ def render_hotel_demand_forecasting():
     # Explainability & Diagnostic Plots
     st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:1.05rem; margin:1.5rem 0 0.4rem;'>Model Explainability & 7-Day Ahead Forecast Validation</p>", unsafe_allow_html=True)
     diag_col1, diag_col2 = st.columns(2)
-    shap_path = _REPO_ROOT / "member1" / "shap_summary.png"
-    actual_path = _REPO_ROOT / "member1" / "forecast_vs_actual.png"
+    shap_path = _APP_ROOT / "member1" / "shap_summary.png"
+    actual_path = _APP_ROOT / "member1" / "forecast_vs_actual.png"
     with diag_col1:
         if shap_path.exists():
             st.image(str(shap_path), caption="Top Demand Drivers: Time-Lags, Indian Holidays, Weekend Surge, AP Seasonality")
