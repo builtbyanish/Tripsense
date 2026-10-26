@@ -1398,7 +1398,7 @@ with switch_c2:
         st.rerun()
 
 with switch_c3:
-    forecast_btn = st.button("Hotel Demand Forecast (M1)", key="mode_forecast_btn", use_container_width=True,
+    forecast_btn = st.button("Hotel Demand Forecast", key="mode_forecast_btn", use_container_width=True,
                              type="primary" if st.session_state.app_mode == "Forecast" else "secondary")
     if forecast_btn:
         st.session_state.app_mode = "Forecast"
@@ -1673,30 +1673,6 @@ def render_hotel_demand_forecasting():
         chart_df = chart_data.set_index("Formatted Date")[["recommended_price"]]
         chart_df.columns = ["Expected Nightly Rate (₹)"]
         st.bar_chart(chart_df, height=220)
-
-    # Collapsed Technical Section for Evaluators & Data Scientists
-    with st.expander("Under the Hood: Machine Learning Models & Technical Evaluation", expanded=False):
-        st.markdown("""
-        <p style="color:#382613; font-size:0.92rem; line-height:1.5; margin-bottom:0.75rem;">
-          TripSense uses <strong>Gradient Boosted Decision Trees (GBDT)</strong> and <strong>Random Forest</strong> models to forecast daily hotel room occupancy.
-          Features include 7, 14, 21, and 28-day historical demand lags, Indian public holidays, weekend arrival spikes, and Andhra Pradesh tourist seasonality.
-        </p>
-        """, unsafe_allow_html=True)
-
-        if not model_metrics_df.empty:
-            st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:0.95rem; margin:0.75rem 0 0.35rem;'>Model Benchmark Comparison (Held-Out Test Window)</p>", unsafe_allow_html=True)
-            st.dataframe(model_metrics_df, use_container_width=True, hide_index=True)
-
-        st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:0.95rem; margin:1rem 0 0.35rem;'>Model Explainability & Forecast Validation</p>", unsafe_allow_html=True)
-        diag_col1, diag_col2 = st.columns(2)
-        shap_path = _APP_ROOT / "member1" / "shap_summary.png"
-        actual_path = _APP_ROOT / "member1" / "forecast_vs_actual.png"
-        with diag_col1:
-            if shap_path.exists():
-                st.image(str(shap_path), caption="Top Demand Drivers (Lags, Holidays, Weekend Surge, Seasonality)")
-        with diag_col2:
-            if actual_path.exists():
-                st.image(str(actual_path), caption="7-Day Ahead Model Predictions vs. Actual Stays")
 
 
 # ===========================================================================
