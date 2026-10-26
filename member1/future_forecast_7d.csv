@@ -1,15 +1,78 @@
 hotel,date,pred_demand,pred_occupancy_pct
-City Hotel,2017-09-01,216.7,96.6
-City Hotel,2017-09-02,215.3,95.9
-City Hotel,2017-09-03,210.2,93.7
-City Hotel,2017-09-04,216.3,96.4
-City Hotel,2017-09-05,217.6,97.0
-City Hotel,2017-09-06,216.4,96.4
-City Hotel,2017-09-07,220.1,98.1
-Resort Hotel,2017-09-01,183.6,99.8
-Resort Hotel,2017-09-02,180.8,98.3
-Resort Hotel,2017-09-03,180.3,98.0
-Resort Hotel,2017-09-04,181.2,98.5
-Resort Hotel,2017-09-05,181.5,98.6
-Resort Hotel,2017-09-06,181.4,98.6
-Resort Hotel,2017-09-07,179.4,97.5
+Sunrise Tirupati Guest House,2026-01-01,114.5,95.4
+Sunrise Tirupati Guest House,2026-01-02,118.6,98.8
+Sunrise Tirupati Guest House,2026-01-03,118.7,98.9
+Sunrise Tirupati Guest House,2026-01-04,117.9,98.2
+Sunrise Tirupati Guest House,2026-01-05,108.1,90.1
+Sunrise Tirupati Guest House,2026-01-06,109.1,90.9
+Sunrise Tirupati Guest House,2026-01-07,112.5,93.8
+Pearl Stays Visakhapatnam,2026-01-01,107.3,97.5
+Pearl Stays Visakhapatnam,2026-01-02,109.9,99.9
+Pearl Stays Visakhapatnam,2026-01-03,110.0,100.0
+Pearl Stays Visakhapatnam,2026-01-04,107.5,97.7
+Pearl Stays Visakhapatnam,2026-01-05,98.1,89.2
+Pearl Stays Visakhapatnam,2026-01-06,98.2,89.3
+Pearl Stays Visakhapatnam,2026-01-07,105.9,96.3
+Sunset Inn Visakhapatnam,2026-01-01,88.9,98.8
+Sunset Inn Visakhapatnam,2026-01-02,91.6,100.0
+Sunset Inn Visakhapatnam,2026-01-03,91.6,100.0
+Sunset Inn Visakhapatnam,2026-01-04,90.9,100.0
+Sunset Inn Visakhapatnam,2026-01-05,83.1,92.4
+Sunset Inn Visakhapatnam,2026-01-06,86.6,96.2
+Sunset Inn Visakhapatnam,2026-01-07,87.8,97.5
+Grand Guest House Kurnool,2026-01-01,78.8,92.7
+Grand Guest House Kurnool,2026-01-02,85.1,100.0
+Grand Guest House Kurnool,2026-01-03,85.2,100.0
+Grand Guest House Kurnool,2026-01-04,82.8,97.4
+Grand Guest House Kurnool,2026-01-05,69.6,81.8
+Grand Guest House Kurnool,2026-01-06,71.2,83.7
+Grand Guest House Kurnool,2026-01-07,78.8,92.8
+Emerald Palnadu Palace,2026-01-01,75.6,94.4
+Emerald Palnadu Palace,2026-01-02,80.3,100.0
+Emerald Palnadu Palace,2026-01-03,80.3,100.0
+Emerald Palnadu Palace,2026-01-04,79.4,99.2
+Emerald Palnadu Palace,2026-01-05,70.7,88.4
+Emerald Palnadu Palace,2026-01-06,68.7,85.9
+Emerald Palnadu Palace,2026-01-07,77.5,96.8
+Mystic Alluri Residency,2026-01-01,62.6,89.4
+Mystic Alluri Residency,2026-01-02,71.2,100.0
+Mystic Alluri Residency,2026-01-03,71.1,100.0
+Mystic Alluri Residency,2026-01-04,68.9,98.4
+Mystic Alluri Residency,2026-01-05,58.3,83.3
+Mystic Alluri Residency,2026-01-06,58.0,82.9
+Mystic Alluri Residency,2026-01-07,61.7,88.2
+Silver Krishna Suites,2026-01-01,77.9,97.4
+Silver Krishna Suites,2026-01-02,80.4,100.0
+Silver Krishna Suites,2026-01-03,80.3,100.0
+Silver Krishna Suites,2026-01-04,78.1,97.6
+Silver Krishna Suites,2026-01-05,70.0,87.5
+Silver Krishna Suites,2026-01-06,73.3,91.6
+Silver Krishna Suites,2026-01-07,75.9,94.8
+Nature Hotel Kakinada,2026-01-01,75.9,94.9
+Nature Hotel Kakinada,2026-01-02,80.3,100.0
+Nature Hotel Kakinada,2026-01-03,80.3,100.0
+Nature Hotel Kakinada,2026-01-04,79.6,99.5
+Nature Hotel Kakinada,2026-01-05,72.2,90.2
+Nature Hotel Kakinada,2026-01-06,71.2,89.0
+Nature Hotel Kakinada,2026-01-07,76.1,95.1
+TripSense Luxury Hotels,2026-01-01,147.9,92.4
+TripSense Luxury Hotels,2026-01-02,158.1,98.8
+TripSense Luxury Hotels,2026-01-03,158.5,99.1
+TripSense Luxury Hotels,2026-01-04,157.6,98.5
+TripSense Luxury Hotels,2026-01-05,142.5,89.1
+TripSense Luxury Hotels,2026-01-06,142.0,88.8
+TripSense Luxury Hotels,2026-01-07,148.2,92.6
+TripSense Mid-Range Hotels,2026-01-01,263.1,94.0
+TripSense Mid-Range Hotels,2026-01-02,275.2,98.3
+TripSense Mid-Range Hotels,2026-01-03,274.9,98.2
+TripSense Mid-Range Hotels,2026-01-04,273.4,97.6
+TripSense Mid-Range Hotels,2026-01-05,260.4,93.0
+TripSense Mid-Range Hotels,2026-01-06,264.9,94.6
+TripSense Mid-Range Hotels,2026-01-07,262.2,93.6
+TripSense Budget Hotels,2026-01-01,285.0,95.0
+TripSense Budget Hotels,2026-01-02,296.5,98.8
+TripSense Budget Hotels,2026-01-03,295.2,98.4
+TripSense Budget Hotels,2026-01-04,294.0,98.0
+TripSense Budget Hotels,2026-01-05,280.9,93.6
+TripSense Budget Hotels,2026-01-06,273.6,91.2
+TripSense Budget Hotels,2026-01-07,284.2,94.7

@@ -1,11 +1,14 @@
 Model,MAE,RMSE,R2
-Naive (lag-7),7.433,11.049,0.714
-Linear Regression,10.409,14.133,0.532
-  Linear Regression [City Hotel],11.176,15.224,-1.558
-  Linear Regression [Resort Hotel],9.641,12.951,-2.257
-Random Forest,5.923,8.023,0.849
-  Random Forest [City Hotel],6.824,8.724,0.16
-  Random Forest [Resort Hotel],5.022,7.255,-0.022
-XGBoost,6.545,8.556,0.829
-  XGBoost [City Hotel],7.742,9.43,0.019
-  XGBoost [Resort Hotel],5.348,7.581,-0.116
+Naive (lag-7),6.35,11.409,0.977
+Linear Regression,5.563,8.632,0.987
+  Linear Regression [Sunrise Tirupati Guest House],4.683,6.183,0.783
+  Linear Regression [Pearl Stays Visakhapatnam],4.204,5.339,0.827
+  Linear Regression [TripSense Mid-Range Hotels],11.809,15.933,0.615
+Random Forest,4.251,7.124,0.991
+  Random Forest [Sunrise Tirupati Guest House],3.806,5.81,0.808
+  Random Forest [Pearl Stays Visakhapatnam],3.655,5.047,0.846
+  Random Forest [TripSense Mid-Range Hotels],8.436,11.672,0.793
+Gradient Boosting,4.063,6.384,0.993
+  Gradient Boosting [Sunrise Tirupati Guest House],3.962,5.625,0.82
+  Gradient Boosting [Pearl Stays Visakhapatnam],3.41,4.718,0.865
+  Gradient Boosting [TripSense Mid-Range Hotels],8.104,11.141,0.812
