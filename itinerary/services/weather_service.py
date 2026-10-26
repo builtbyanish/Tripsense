@@ -167,6 +167,7 @@ def get_weather_for_place(
     target_date: Optional[date] = None,
     lat: Optional[float] = None,
     lon: Optional[float] = None,
+    precomputed_forecasts: Optional[dict[str, dict]] = None,
     *args,
     **kwargs,
 ) -> Optional[dict]:
@@ -176,15 +177,20 @@ def get_weather_for_place(
         lat = kwargs.get("lat")
     if lon is None:
         lon = kwargs.get("lon")
+    if precomputed_forecasts is None:
+        precomputed_forecasts = kwargs.get("precomputed_forecasts")
     """
     Return weather summary for a place, utilizing live numerical prediction models
     (Open-Meteo) if target_date falls within the 14-day forecast window, or
     falling back to historical monthly climate tables.
     """
     # 1. Try numerical prediction forecast if target_date and coordinates available
-    if target_date is not None and lat is not None and lon is not None:
+    if target_date is not None and (precomputed_forecasts is not None or (lat is not None and lon is not None)):
         try:
-            forecasts = get_live_forecast_for_coords(float(lat), float(lon))
+            if precomputed_forecasts is not None:
+                forecasts = precomputed_forecasts
+            else:
+                forecasts = get_live_forecast_for_coords(round(float(lat), 1), round(float(lon), 1))
             d_str = target_date.strftime("%Y-%m-%d")
             if d_str in forecasts:
                 fc = forecasts[d_str]
@@ -307,6 +313,8 @@ def get_weather_for_places(
     weather_df: pd.DataFrame,
     target_date: Optional[date] = None,
     place_coords: Optional[dict[str, tuple[float, float]]] = None,
+    district: Optional[str] = None,
+    precomputed_forecasts: Optional[dict[str, dict]] = None,
     *args,
     **kwargs,
 ) -> dict[str, dict]:
@@ -314,16 +322,49 @@ def get_weather_for_places(
         target_date = kwargs.get("target_date")
     if place_coords is None:
         place_coords = kwargs.get("place_coords")
+    if district is None:
+        district = kwargs.get("district")
+    if precomputed_forecasts is None:
+        precomputed_forecasts = kwargs.get("precomputed_forecasts")
     """
     Return weather summaries for multiple place IDs, incorporating live model forecasts
     when target_date and place_coords are provided.
+    Batch-prefetches regional forecast once to ensure sub-second response times.
     """
+    if target_date is not None and precomputed_forecasts is None:
+        ref_lat, ref_lon = None, None
+        if district:
+            d_clean = district.lower().strip()
+            for k, c_pair in DISTRICT_COORDS.items():
+                if k in d_clean or d_clean in k:
+                    ref_lat, ref_lon = c_pair
+                    break
+        if (ref_lat is None or ref_lon is None) and place_coords:
+            valid_lats = [c[0] for c in place_coords.values() if c and c[0] is not None]
+            valid_lons = [c[1] for c in place_coords.values() if c and c[1] is not None]
+            if valid_lats and valid_lons:
+                ref_lat = sum(valid_lats) / len(valid_lats)
+                ref_lon = sum(valid_lons) / len(valid_lons)
+        if ref_lat is not None and ref_lon is not None:
+            try:
+                precomputed_forecasts = get_live_forecast_for_coords(round(ref_lat, 2), round(ref_lon, 2))
+            except Exception as e:
+                log.warning("Regional batch forecast fetch failed: %s", e)
+
     result = {}
     for pid in place_ids:
         lat, lon = (None, None)
         if place_coords and pid in place_coords:
             lat, lon = place_coords[pid]
-        w = get_weather_for_place(pid, month, weather_df, target_date=target_date, lat=lat, lon=lon)
+        w = get_weather_for_place(
+            pid,
+            month,
+            weather_df,
+            target_date=target_date,
+            lat=lat,
+            lon=lon,
+            precomputed_forecasts=precomputed_forecasts,
+        )
         if w is not None:
             result[pid] = w
     return result

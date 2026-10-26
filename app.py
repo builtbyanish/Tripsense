@@ -1408,7 +1408,7 @@ if search_submitted:
         }
         try:
             weather_data = weather_service.get_weather_for_places(
-                place_ids, target_month, weather_df, target_date=start_date, place_coords=place_coords
+                place_ids, target_month, weather_df, target_date=start_date, place_coords=place_coords, district=district
             )
         except (TypeError, Exception):
             weather_data = weather_service.get_weather_for_places(
