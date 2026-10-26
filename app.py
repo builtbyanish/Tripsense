@@ -1394,8 +1394,21 @@ if search_submitted:
 
     if not recs.empty:
         place_ids = recs["place_id"].tolist()
-        weather_data = weather_service.get_weather_for_places(place_ids, target_month, weather_df)
+        place_coords = {
+            str(row["place_id"]): (
+                float(row["latitude"]) if pd.notna(row.get("latitude")) else None,
+                float(row["longitude"]) if pd.notna(row.get("longitude")) else None,
+            )
+            for _, row in recs.iterrows()
+        }
+        weather_data = weather_service.get_weather_for_places(
+            place_ids, target_month, weather_df, target_date=start_date, place_coords=place_coords
+        )
         st.session_state.weather_data = weather_data
+
+        # Numerical Weather Prediction Model Cyclone & Extreme Weather Check
+        severe_alert = weather_service.check_trip_severe_weather(district, start_date, int(n_days))
+        st.session_state.severe_weather_alert = severe_alert
 
         date_scores_result = {}
         if start_date and not best_months_df.empty:
@@ -1487,6 +1500,33 @@ if st.session_state.app_mode == "Trip":
                 <span style="font-weight:700; color:#8C5A20; font-size:0.92rem; text-transform:uppercase; letter-spacing:0.04em;">TripSense RAG Planner Intelligence</span>
               </div>
               <p style="color:#382613; font-size:0.92rem; margin:0; line-height:1.55;">{rag_insight_text}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Numerical Weather Prediction Model Cyclone & Severe Weather Warning Banner
+        severe_alert = st.session_state.get("severe_weather_alert", {})
+        if severe_alert and severe_alert.get("has_severe_weather"):
+            is_cyc = severe_alert.get("is_cyclone", False)
+            b_bg = "#FFF2F0" if is_cyc else "#FFFBE6"
+            b_border = "#FF4D4F" if is_cyc else "#FAAD14"
+            b_accent = "#D32F2F" if is_cyc else "#D48806"
+            b_text = "#B71C1C" if is_cyc else "#874D00"
+            b_icon = "alert-triangle" if is_cyc else "alert-circle"
+
+            st.markdown(f"""
+            <div style="background:{b_bg}; border:2px solid {b_border}; border-left:6px solid {b_accent}; border-radius:14px; padding:1.1rem 1.35rem; margin:0.75rem 0 1.25rem; box-shadow:0 4px 16px rgba(211, 47, 47, 0.12);">
+              <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.35rem;">
+                {icons.get_icon(b_icon, size=22, color=b_accent)}
+                <span style="font-weight:800; color:{b_text}; font-size:1.05rem; text-transform:uppercase; letter-spacing:0.02em;">
+                  {html.escape(severe_alert.get('banner_title', 'Severe Weather Warning'))}
+                </span>
+              </div>
+              <p style="color:#381515; font-size:0.95rem; font-weight:600; margin:0 0 0.4rem; line-height:1.5;">
+                {html.escape(severe_alert.get('banner_body', ''))}
+              </p>
+              <div style="font-size:0.88rem; color:{b_text}; font-weight:700;">
+                Safety Advisory: {html.escape(severe_alert.get('safety_advisory', ''))}
+              </div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -1614,22 +1654,35 @@ if st.session_state.app_mode == "Trip":
 
                     dist_badge_markup = f'<span class="editorial-badge-pill badge-gold">{dist_from_prev:.1f} km from {html.escape(prev_stop_name)}</span>' if dist_from_prev > 0 else ""
                     
-                    # Destination Weather Condition
+                    # Destination Weather Condition & Meteorological Model Output
+                    w_map = st.session_state.get("weather_data", {})
+                    w_info = w_map.get(p_id) if isinstance(w_map, dict) else None
+                    is_severe_dest = False
                     stop_weather = getattr(stop, "weather_note", "").strip()
-                    if not stop_weather:
-                        w_map = st.session_state.get("weather_data", {})
-                        w_info = w_map.get(p_id) if isinstance(w_map, dict) else None
+
+                    if w_info and w_info.get("is_severe"):
+                        is_severe_dest = True
+                        stop_weather = w_info.get("weather_note", "Cyclone Warning: Travel Not Advised")
+                    elif not stop_weather:
                         if w_info:
                             stop_weather = f"{w_info.get('temp_label', '').capitalize()} ({w_info.get('avg_temp_c', '')}°C), {w_info.get('rain_label', '')}"
                         else:
                             stop_weather = "Pleasant (26°C), Moderate Climate"
 
-                    weather_badge_markup = f"""
-                    <div style="display:inline-flex; align-items:center; gap:0.35rem; background:#FFFDF8; border:1px solid #D4B37C; border-radius:999px; padding:3px 12px; font-size:0.82rem; font-weight:600; color:#8C5A20;">
-                      {icons.get_icon("sun", size=14, color="#C8963E")}
-                      <span>{html.escape(stop_weather)}</span>
-                    </div>
-                    """
+                    if is_severe_dest:
+                        weather_badge_markup = f"""
+                        <div style="display:inline-flex; align-items:center; gap:0.35rem; background:#FFF1F0; border:1.5px solid #FF4D4F; border-radius:999px; padding:3px 12px; font-size:0.82rem; font-weight:700; color:#CF1322;">
+                          {icons.get_icon("alert-triangle", size=14, color="#CF1322")}
+                          <span>{html.escape(stop_weather)}</span>
+                        </div>
+                        """
+                    else:
+                        weather_badge_markup = f"""
+                        <div style="display:inline-flex; align-items:center; gap:0.35rem; background:#FFFDF8; border:1px solid #D4B37C; border-radius:999px; padding:3px 12px; font-size:0.82rem; font-weight:600; color:#8C5A20;">
+                          {icons.get_icon("sun", size=14, color="#C8963E")}
+                          <span>{html.escape(stop_weather)}</span>
+                        </div>
+                        """
 
                     c_img, c_info = st.columns([1.2, 2.2])
                     with c_img:

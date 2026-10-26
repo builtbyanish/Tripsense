@@ -452,10 +452,13 @@ def build_itinerary(
             weather_note = ""
             if weather_data and p.get("place_id") in weather_data:
                 w = weather_data[p["place_id"]]
-                weather_note = (
-                    f"{w.get('temp_label','').capitalize()} ({w.get('avg_temp_c','')}°C), "
-                    f"{w.get('rain_label','')}."
-                )
+                if w.get("weather_note"):
+                    weather_note = w["weather_note"]
+                else:
+                    weather_note = (
+                        f"{w.get('temp_label','').capitalize()} ({w.get('avg_temp_c','')}°C), "
+                        f"{w.get('rain_label','')}."
+                    )
 
             stop = ItineraryStop(
                 place_id=str(p.get("place_id", "")),

@@ -387,6 +387,14 @@ class TestWeatherService:
             assert "avg_temp_c" in summary
             assert "district" in summary
 
+    def test_live_cyclone_prediction_and_severe_alert(self):
+        alert = weather_service.check_trip_severe_weather("Visakhapatnam", date(2026, 10, 27), 2)
+        assert isinstance(alert, dict)
+        if alert.get("has_severe_weather"):
+            assert alert.get("is_cyclone") is True
+            assert "cyclone" in alert.get("banner_title", "").lower()
+            assert alert.get("max_rain_mm", 0) > 30.0
+
 
 # ---------------------------------------------------------------------------
 # 6. Hotel service
