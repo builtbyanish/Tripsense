@@ -56,6 +56,11 @@ from itinerary.services import (
     photo_service,
     icons,
 )
+import importlib
+try:
+    importlib.reload(weather_service)
+except Exception:
+    pass
 from src.services import wikipedia_images
 
 # Itinerary engine
@@ -1401,13 +1406,21 @@ if search_submitted:
             )
             for _, row in recs.iterrows()
         }
-        weather_data = weather_service.get_weather_for_places(
-            place_ids, target_month, weather_df, target_date=start_date, place_coords=place_coords
-        )
+        try:
+            weather_data = weather_service.get_weather_for_places(
+                place_ids, target_month, weather_df, target_date=start_date, place_coords=place_coords
+            )
+        except (TypeError, Exception):
+            weather_data = weather_service.get_weather_for_places(
+                place_ids, target_month, weather_df
+            )
         st.session_state.weather_data = weather_data
 
         # Numerical Weather Prediction Model Cyclone & Extreme Weather Check
-        severe_alert = weather_service.check_trip_severe_weather(district, start_date, int(n_days))
+        try:
+            severe_alert = weather_service.check_trip_severe_weather(district, start_date, int(n_days))
+        except Exception:
+            severe_alert = {"has_severe_weather": False, "is_cyclone": False}
         st.session_state.severe_weather_alert = severe_alert
 
         date_scores_result = {}

@@ -167,7 +167,15 @@ def get_weather_for_place(
     target_date: Optional[date] = None,
     lat: Optional[float] = None,
     lon: Optional[float] = None,
+    *args,
+    **kwargs,
 ) -> Optional[dict]:
+    if target_date is None:
+        target_date = kwargs.get("target_date")
+    if lat is None:
+        lat = kwargs.get("lat")
+    if lon is None:
+        lon = kwargs.get("lon")
     """
     Return weather summary for a place, utilizing live numerical prediction models
     (Open-Meteo) if target_date falls within the 14-day forecast window, or
@@ -299,7 +307,13 @@ def get_weather_for_places(
     weather_df: pd.DataFrame,
     target_date: Optional[date] = None,
     place_coords: Optional[dict[str, tuple[float, float]]] = None,
+    *args,
+    **kwargs,
 ) -> dict[str, dict]:
+    if target_date is None:
+        target_date = kwargs.get("target_date")
+    if place_coords is None:
+        place_coords = kwargs.get("place_coords")
     """
     Return weather summaries for multiple place IDs, incorporating live model forecasts
     when target_date and place_coords are provided.
