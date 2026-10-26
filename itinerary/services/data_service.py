@@ -42,6 +42,9 @@ CALENDAR_CSV       = _REPO_ROOT / "data" / "calendars"    / "calendar_india.csv"
 HOLIDAY_CROWD_CSV  = _REPO_ROOT / "data" / "calendars"    / "holiday_crowd.csv"
 BEST_MONTHS_CSV    = _REPO_ROOT / "data" / "calendars"    / "best_months_results.csv"
 BEST_DATES_CSV     = _REPO_ROOT / "data" / "calendars"    / "best_dates_results.csv"
+MEMBER1_FORECAST_CSV = _REPO_ROOT / "member1" / "future_forecast_7d.csv"
+MEMBER1_METRICS_CSV  = _REPO_ROOT / "member1" / "model_metrics.csv"
+MEMBER1_PRICING_CSV  = _REPO_ROOT / "member1" / "hotel_pricing.csv"
 
 # ---------------------------------------------------------------------------
 # Minimum required columns per dataset
@@ -174,3 +177,15 @@ def load_all() -> dict[str, pd.DataFrame]:
         "holiday_crowd":   load_holiday_crowd(),
         "best_months":     load_best_months(),
     }
+
+
+def load_demand_forecast(path: Optional[Path] = None) -> pd.DataFrame:
+    return _read_csv(path or MEMBER1_FORECAST_CSV)
+
+
+def load_model_metrics(path: Optional[Path] = None) -> pd.DataFrame:
+    return _read_csv(path or MEMBER1_METRICS_CSV)
+
+
+def load_hotel_pricing(path: Optional[Path] = None) -> pd.DataFrame:
+    return _read_csv(path or MEMBER1_PRICING_CSV)

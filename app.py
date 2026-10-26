@@ -1114,9 +1114,12 @@ def _load_all_data():
     ri_df = data_service.load_review_insights()
     i_df = data_service.load_interactions()
     hr_df = data_service.load_hotel_reviews()
-    return p_df, h_df, w_df, bm_df, ri_df, i_df, hr_df
+    fc_df = data_service.load_demand_forecast()
+    met_df = data_service.load_model_metrics()
+    pr_df = data_service.load_hotel_pricing()
+    return p_df, h_df, w_df, bm_df, ri_df, i_df, hr_df, fc_df, met_df, pr_df
 
-places_df, hotels_df, weather_df, best_months_df, review_insights_df, interactions_df, hotel_reviews_df = _load_all_data()
+places_df, hotels_df, weather_df, best_months_df, review_insights_df, interactions_df, hotel_reviews_df, demand_forecast_df, model_metrics_df, hotel_pricing_df = _load_all_data()
 
 # Pre-load Wikipedia Image Manifest
 wikipedia_images.load_manifest()
@@ -1980,6 +1983,69 @@ if st.session_state.app_mode == "Trip":
         except Exception:
             pass
 
+    # ---------------------------------------------------------------------------
+    # Historical Weather & Climate Exploration Section
+    # ---------------------------------------------------------------------------
+    st.markdown('<div style="margin-top: 2rem;"></div>', unsafe_allow_html=True)
+    with st.expander("Historical Weather & Climate Exploration", expanded=False):
+        st.markdown("""
+        <div style="margin-bottom: 0.75rem;">
+          <span class="editorial-badge-pill badge-gold">Historical Weather Dataset</span>
+          <h3 style="font-size: 1.35rem; font-weight: 800; margin: 0.35rem 0 0.25rem; color: #2E1B0A; font-family: 'Outfit', sans-serif;">
+            12-Month Climate Exploration Across Andhra Pradesh
+          </h3>
+          <p style="color: #6B5238; font-size: 0.9rem; margin: 0;">
+            Comprehensive empirical climate data (2023 dataset) across all 26 Andhra Pradesh districts, highlighting temperature ranges, monthly monsoon deluges, and outdoor suitability.
+          </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        w_dist_list = sorted([d for d in places_df["district"].dropna().unique() if d])
+        curr_dist = district if (district and district in w_dist_list) else w_dist_list[0]
+        chosen_w_dist = st.selectbox("Select District for Climate Profile", w_dist_list, index=w_dist_list.index(curr_dist), key="hist_weather_dist")
+
+        # Filter places in that district to get representative weather
+        dist_pids = places_df[places_df["district"] == chosen_w_dist]["place_id"].tolist()
+        dist_weather = weather_df[weather_df["place_id"].isin(dist_pids)].copy()
+
+        if not dist_weather.empty:
+            month_names_map = {
+                1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
+                7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"
+            }
+            monthly_agg = dist_weather.groupby("month").agg(
+                avg_temp=("avg_temp_c", "mean"),
+                avg_rain=("total_rainfall_mm", "mean")
+            ).reset_index()
+            monthly_agg["month_label"] = monthly_agg["month"].map(month_names_map)
+            monthly_agg["avg_temp"] = monthly_agg["avg_temp"].round(1)
+            monthly_agg["avg_rain"] = monthly_agg["avg_rain"].round(1)
+
+            # Display 4 climate metric summary cards
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+            hottest_month = monthly_agg.loc[monthly_agg["avg_temp"].idxmax()]
+            coolest_month = monthly_agg.loc[monthly_agg["avg_temp"].idxmin()]
+            wettest_month = monthly_agg.loc[monthly_agg["avg_rain"].idxmax()]
+            annual_rain = monthly_agg["avg_rain"].sum()
+
+            with col_m1:
+                st.metric("Warmest Month", f"{hottest_month['month_label']} ({hottest_month['avg_temp']}°C)")
+            with col_m2:
+                st.metric("Coolest Month", f"{coolest_month['month_label']} ({coolest_month['avg_temp']}°C)")
+            with col_m3:
+                st.metric("Peak Rainfall", f"{wettest_month['month_label']} ({wettest_month['avg_rain']} mm)")
+            with col_m4:
+                st.metric("Annual Rainfall", f"{annual_rain:.0f} mm")
+
+            # 12-Month Table & Chart
+            st.markdown(f"<p style='font-weight:700; color:#2E1B0A; font-size:0.95rem; margin:1rem 0 0.5rem;'>12-Month Temperature (°C) & Rainfall (mm) Pattern — {html.escape(chosen_w_dist)}</p>", unsafe_allow_html=True)
+            chart_df = monthly_agg.set_index("month_label")[["avg_temp", "avg_rain"]]
+            chart_df.columns = ["Avg Temp (°C)", "Total Rain (mm)"]
+            st.bar_chart(chart_df, height=220)
+        else:
+            st.info(f"No specific historical climate records found for {chosen_w_dist}.")
+
+
 
 
 # ===========================================================================
@@ -2210,6 +2276,81 @@ else:
               </div>
             </div>
             """, unsafe_allow_html=True)
+
+
+        # ---------------------------------------------------------------------------
+        # Member 1: Hotel Demand Forecasting & Dynamic Pricing Intelligence
+        # ---------------------------------------------------------------------------
+        st.markdown("""
+        <div style="margin: 3rem 0 1.25rem;">
+          <span class="editorial-badge-pill badge-gold">Member 1 Hospitality Intelligence</span>
+          <h2 style="font-size: 2rem; font-weight: 800; margin: 0.35rem 0 0.4rem; letter-spacing: -0.02em; color: var(--text-espresso); font-family: 'Outfit', sans-serif;">
+            Hotel Demand Forecasting & Dynamic Pricing
+          </h2>
+          <p style="color: #6B5238; font-size: 0.95rem; margin: 0; line-height: 1.5;">
+            Supervised time-series models (XGBoost, Random Forest, Linear Regression) predicting daily room-night demand, occupancy rate projections, and dynamic price multipliers.
+          </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.expander("Explore Member 1 Hotel Demand Forecast & ML Models", expanded=True):
+            f_col1, f_col2 = st.columns([1.2, 1.8])
+            with f_col1:
+                hotel_choice = st.radio("Hotel Type", ["City Hotel", "Resort Hotel"], horizontal=True, key="m1_hotel_choice")
+            with f_col2:
+                st.caption("Target: Daily occupied room-nights per hotel property, forecast 7 days ahead without data leakage.")
+
+            if not demand_forecast_df.empty:
+                h_sub = demand_forecast_df[demand_forecast_df["hotel"] == hotel_choice].copy()
+                if not h_sub.empty:
+                    avg_dem = h_sub["pred_demand"].mean()
+                    peak_occ = h_sub["pred_occupancy_pct"].max()
+                    m1, m2, m3, m4 = st.columns(4)
+                    with m1:
+                        st.metric("Avg Predicted Demand", f"{avg_dem:.1f} rooms/day")
+                    with m2:
+                        st.metric("Peak Projected Occupancy", f"{peak_occ:.1f}%")
+                    with m3:
+                        st.metric("Forecast Horizon", "7 Days Ahead")
+                    with m4:
+                        st.metric("Best Model", "Random Forest / XGB")
+
+                    st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:0.95rem; margin:1rem 0 0.4rem;'>7-Day Predicted Demand & Occupancy Schedule</p>", unsafe_allow_html=True)
+                    st.dataframe(h_sub[["date", "pred_demand", "pred_occupancy_pct"]].rename(columns={
+                        "date": "Forecast Date",
+                        "pred_demand": "Predicted Occupied Rooms",
+                        "pred_occupancy_pct": "Projected Occupancy (%)"
+                    }), use_container_width=True, hide_index=True)
+
+            # Model Benchmark Metrics
+            if not model_metrics_df.empty:
+                st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:0.95rem; margin:1.25rem 0 0.4rem;'>Machine Learning Model Evaluation Benchmark (Test Set: Last 120 Days)</p>", unsafe_allow_html=True)
+                st.dataframe(model_metrics_df, use_container_width=True, hide_index=True)
+
+            # Dynamic Pricing Sample
+            if not hotel_pricing_df.empty:
+                st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:0.95rem; margin:1.25rem 0 0.4rem;'>Dynamic Pricing Engine (Demand-Driven ADR Multiplier)</p>", unsafe_allow_html=True)
+                sample_pricing = hotel_pricing_df[hotel_pricing_df["hotel"] == hotel_choice].head(7)
+                st.dataframe(sample_pricing[["date", "demand_level", "base_adr", "price_multiplier", "recommended_price"]].rename(columns={
+                    "date": "Date",
+                    "demand_level": "Demand Tier",
+                    "base_adr": "Base Rate ($)",
+                    "price_multiplier": "Pricing Multiplier",
+                    "recommended_price": "Recommended Rate ($)"
+                }), use_container_width=True, hide_index=True)
+
+            # Explainability & Diagnostic Plots
+            st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:0.95rem; margin:1.25rem 0 0.4rem;'>Model Explainability (SHAP Values & Forecast Validation)</p>", unsafe_allow_html=True)
+            diag_col1, diag_col2 = st.columns(2)
+            shap_path = _REPO_ROOT / "member1" / "shap_summary.png"
+            actual_path = _REPO_ROOT / "member1" / "forecast_vs_actual.png"
+            with diag_col1:
+                if shap_path.exists():
+                    st.image(str(shap_path), caption="SHAP Summary: Top Demand Drivers (Lags, Seasonality, Holidays)")
+            with diag_col2:
+                if actual_path.exists():
+                    st.image(str(actual_path), caption="7-Day Ahead Forecast vs. Actual Room Demand")
+
 
 # ---------------------------------------------------------------------------
 # Footer
