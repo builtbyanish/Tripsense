@@ -58,6 +58,7 @@ from itinerary.services import (
 )
 import importlib
 try:
+    importlib.reload(data_service)
     importlib.reload(weather_service)
 except Exception:
     pass
@@ -1114,10 +1115,32 @@ def _load_all_data_v3():
     ri_df = data_service.load_review_insights()
     i_df = data_service.load_interactions()
     hr_df = data_service.load_hotel_reviews()
-    fc_df = data_service.load_demand_forecast()
-    met_df = data_service.load_model_metrics()
-    pr_df = data_service.load_hotel_pricing()
-    pld_df = data_service.load_places_hotel_demand()
+
+    # Member 1 artifacts with resilient fallback
+    if hasattr(data_service, "load_demand_forecast"):
+        fc_df = data_service.load_demand_forecast()
+    else:
+        fc_p = _APP_ROOT / "member1" / "future_forecast_7d.csv"
+        fc_df = pd.read_csv(fc_p) if fc_p.exists() else pd.DataFrame()
+
+    if hasattr(data_service, "load_model_metrics"):
+        met_df = data_service.load_model_metrics()
+    else:
+        met_p = _APP_ROOT / "member1" / "model_metrics.csv"
+        met_df = pd.read_csv(met_p) if met_p.exists() else pd.DataFrame()
+
+    if hasattr(data_service, "load_hotel_pricing"):
+        pr_df = data_service.load_hotel_pricing()
+    else:
+        pr_p = _APP_ROOT / "member1" / "hotel_pricing.csv"
+        pr_df = pd.read_csv(pr_p) if pr_p.exists() else pd.DataFrame()
+
+    if hasattr(data_service, "load_places_hotel_demand"):
+        pld_df = data_service.load_places_hotel_demand()
+    else:
+        pld_p = _APP_ROOT / "member1" / "places_hotel_demand.csv"
+        pld_df = pd.read_csv(pld_p) if pld_p.exists() else pd.DataFrame()
+
     return p_df, h_df, w_df, bm_df, ri_df, i_df, hr_df, fc_df, met_df, pr_df, pld_df
 
 places_df, hotels_df, weather_df, best_months_df, review_insights_df, interactions_df, hotel_reviews_df, demand_forecast_df, model_metrics_df, hotel_pricing_df, places_hotel_demand_df = _load_all_data_v3()
