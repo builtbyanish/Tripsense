@@ -45,6 +45,7 @@ BEST_DATES_CSV     = _REPO_ROOT / "data" / "calendars"    / "best_dates_results.
 MEMBER1_FORECAST_CSV = _REPO_ROOT / "member1" / "future_forecast_7d.csv"
 MEMBER1_METRICS_CSV  = _REPO_ROOT / "member1" / "model_metrics.csv"
 MEMBER1_PRICING_CSV  = _REPO_ROOT / "member1" / "hotel_pricing.csv"
+MEMBER1_PLACES_DEMAND_CSV = _REPO_ROOT / "member1" / "places_hotel_demand.csv"
 
 # ---------------------------------------------------------------------------
 # Minimum required columns per dataset
@@ -189,3 +190,7 @@ def load_model_metrics(path: Optional[Path] = None) -> pd.DataFrame:
 
 def load_hotel_pricing(path: Optional[Path] = None) -> pd.DataFrame:
     return _read_csv(path or MEMBER1_PRICING_CSV)
+
+
+def load_places_hotel_demand(path: Optional[Path] = None) -> pd.DataFrame:
+    return _read_csv(path or MEMBER1_PLACES_DEMAND_CSV)

@@ -1106,7 +1106,7 @@ if not st.session_state.get("has_shown_welcome_splash", False):
 # Data Loading & Caching
 # ---------------------------------------------------------------------------
 @st.cache_data
-def _load_all_data():
+def _load_all_data_v3():
     p_df = data_service.load_places()
     h_df = data_service.load_hotels()
     w_df = data_service.load_weather()
@@ -1117,9 +1117,10 @@ def _load_all_data():
     fc_df = data_service.load_demand_forecast()
     met_df = data_service.load_model_metrics()
     pr_df = data_service.load_hotel_pricing()
-    return p_df, h_df, w_df, bm_df, ri_df, i_df, hr_df, fc_df, met_df, pr_df
+    pld_df = data_service.load_places_hotel_demand()
+    return p_df, h_df, w_df, bm_df, ri_df, i_df, hr_df, fc_df, met_df, pr_df, pld_df
 
-places_df, hotels_df, weather_df, best_months_df, review_insights_df, interactions_df, hotel_reviews_df, demand_forecast_df, model_metrics_df, hotel_pricing_df = _load_all_data()
+places_df, hotels_df, weather_df, best_months_df, review_insights_df, interactions_df, hotel_reviews_df, demand_forecast_df, model_metrics_df, hotel_pricing_df, places_hotel_demand_df = _load_all_data_v3()
 
 # Pre-load Wikipedia Image Manifest
 wikipedia_images.load_manifest()
@@ -1491,65 +1492,111 @@ def render_hotel_demand_forecasting():
     <div style="margin: 2rem 0 1.25rem;">
       <span class="editorial-badge-pill badge-gold">Member 1 Hospitality Intelligence</span>
       <h2 style="font-size: 2.1rem; font-weight: 800; margin: 0.35rem 0 0.4rem; letter-spacing: -0.02em; color: var(--text-espresso); font-family: 'Outfit', sans-serif;">
-        TripSense Hotel Demand Forecasting & Dynamic Pricing
+        Hotel Demand Forecasting & Pricing near 444 Destinations
       </h2>
       <p style="color: #6B5238; font-size: 0.95rem; margin: 0; line-height: 1.55;">
-        Supervised time-series machine learning models (Gradient Boosting, Random Forest, Linear Regression) predicting daily room-night demand, occupancy rates, and dynamic ADR pricing across authentic Andhra Pradesh hotels from <code>tripsense_hotels.csv</code>.
+        Supervised time-series machine learning models (Gradient Boosting, Random Forest, Linear Regression) predicting daily room demand, occupancy rates, and dynamic ADR pricing for authentic hotels near all 444 tourist destinations in Andhra Pradesh.
       </p>
     </div>
     """, unsafe_allow_html=True)
 
-    if demand_forecast_df.empty:
-        st.info("Demand forecasting dataset is currently loading.")
+    if places_hotel_demand_df.empty:
+        st.info("Demand forecasting dataset is loading.")
         return
 
-    avail_hotels = sorted(demand_forecast_df["hotel"].unique().tolist())
-    def_idx = avail_hotels.index("Sunrise Tirupati Guest House") if "Sunrise Tirupati Guest House" in avail_hotels else 0
+    # Select District Filter & Tourist Place
+    all_districts = ["All Districts"] + sorted(places_hotel_demand_df["district"].dropna().unique().tolist())
+    fc_c1, fc_c2 = st.columns([1.2, 2.0])
+    with fc_c1:
+        sel_district = st.selectbox("Filter by District", all_districts, index=0, key="m1_fc_dist")
 
-    f_col1, f_col2 = st.columns([1.5, 1.5])
-    with f_col1:
-        chosen_hotel = st.selectbox("Select Authentic TripSense Hotel or Category", avail_hotels, index=def_idx, key="m1_hotel_select")
-    with f_col2:
-        st.caption("Forecast Horizon: 7 Days Ahead recursive prediction | Features: Time-lags (7, 14, 21, 28), Indian holidays, AP tourist seasonality, and weekend arrivals.")
+    if sel_district == "All Districts":
+        filtered_places_sub = places_hotel_demand_df
+    else:
+        filtered_places_sub = places_hotel_demand_df[places_hotel_demand_df["district"] == sel_district]
 
-    h_sub = demand_forecast_df[demand_forecast_df["hotel"] == chosen_hotel].copy()
-    if not h_sub.empty:
-        avg_dem = h_sub["pred_demand"].mean()
-        peak_occ = h_sub["pred_occupancy_pct"].max()
+    place_list = sorted(filtered_places_sub["place_name"].unique().tolist())
+    def_place_idx = place_list.index("Sri Venkateswara Swamy Vaari Temple") if "Sri Venkateswara Swamy Vaari Temple" in place_list else 0
+    with fc_c2:
+        chosen_place = st.selectbox(
+            f"Select Tourist Destination ({len(place_list)} Places in {sel_district})",
+            place_list,
+            index=def_place_idx,
+            key="m1_fc_place"
+        )
+
+    # Extract records for hotels near this selected place
+    place_hotels_sub = places_hotel_demand_df[places_hotel_demand_df["place_name"] == chosen_place].copy()
+
+    if not place_hotels_sub.empty:
+        unique_nearby_hotels = place_hotels_sub["hotel_name"].unique().tolist()
+        avg_demand_val = place_hotels_sub["pred_demand"].mean()
+        peak_occ_val = place_hotels_sub["pred_occupancy_pct"].max()
+        peak_rate_val = place_hotels_sub["recommended_price"].max()
+        base_rate_val = place_hotels_sub["base_adr"].min()
+
         m1, m2, m3, m4 = st.columns(4)
         with m1:
-            st.metric("Avg Predicted Demand", f"{avg_dem:.1f} rooms/day")
+            st.metric("Nearby Verified Hotels", f"{len(unique_nearby_hotels)} Stays")
         with m2:
-            st.metric("Peak Projected Occupancy", f"{peak_occ:.1f}%")
+            st.metric("Projected Peak Occupancy", f"{peak_occ_val:.1f}%")
         with m3:
-            st.metric("Forecast Horizon", "7 Days Ahead")
+            st.metric("Avg Daily Demand", f"{avg_demand_val:.1f} rooms/day")
         with m4:
-            st.metric("Top Model", "Gradient Boosting (GBDT)")
+            st.metric("Dynamic Price Range", f"₹{base_rate_val:,.0f} – ₹{peak_rate_val:,.0f}")
 
-        st.markdown(f"<p style='font-weight:700; color:#2E1B0A; font-size:1.05rem; margin:1.25rem 0 0.4rem;'>7-Day Forward Room Demand & Occupancy Projection — {html.escape(chosen_hotel)}</p>", unsafe_allow_html=True)
-        st.dataframe(h_sub[["date", "pred_demand", "pred_occupancy_pct"]].rename(columns={
-            "date": "Forecast Date",
+        # Hotel specific tab or sub-selector if multiple hotels exist near this destination
+        if len(unique_nearby_hotels) > 1:
+            chosen_nearby_hotel = st.radio(
+                "Select Verified Hotel near this Destination",
+                unique_nearby_hotels,
+                horizontal=True,
+                key="m1_nearby_hotel_radio"
+            )
+        else:
+            chosen_nearby_hotel = unique_nearby_hotels[0]
+
+        hotel_spec_sub = place_hotels_sub[place_hotels_sub["hotel_name"] == chosen_nearby_hotel].copy()
+
+        h_tier_badge = hotel_spec_sub["tier"].iloc[0]
+        h_base_price = hotel_spec_sub["base_adr"].iloc[0]
+        h_dist_name = hotel_spec_sub["district"].iloc[0]
+
+        st.markdown(f"""
+        <div style="background:#FFFDF8; border:1.5px solid #D4B37C; border-left:4px solid #C8963E; border-radius:12px; padding:0.85rem 1.25rem; margin:0.75rem 0 1rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+            <div>
+              <span class="editorial-badge-pill badge-gold">{html.escape(str(h_tier_badge))}</span>
+              <strong style="color:#2E1B0A; font-size:1.15rem; margin-left:0.4rem;">{html.escape(str(chosen_nearby_hotel))}</strong>
+              <span style="color:#6B5238; font-size:0.88rem; margin-left:0.4rem;">&bull; Near {html.escape(str(chosen_place))} ({html.escape(str(h_dist_name))})</span>
+            </div>
+            <div>
+              <span style="font-size:0.85rem; color:#6B5238;">Base Rate: </span>
+              <strong style="font-size:1.1rem; color:#8C5A20;">₹{h_base_price:,.0f}/night</strong>
+            </div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # 7-Day Demand & Dynamic Pricing Table
+        st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:1.02rem; margin:1rem 0 0.4rem;'>7-Day Forward Demand & Dynamic Pricing Schedule (Upcoming 2026 Season)</p>", unsafe_allow_html=True)
+        st.dataframe(hotel_spec_sub[[
+            "date", "pred_demand", "capacity", "pred_occupancy_pct",
+            "demand_level", "price_multiplier", "recommended_price"
+        ]].rename(columns={
+            "date": "Stay Date",
             "pred_demand": "Predicted Occupied Rooms",
-            "pred_occupancy_pct": "Projected Occupancy (%)"
+            "capacity": "Capacity Proxy",
+            "pred_occupancy_pct": "Projected Occupancy (%)",
+            "demand_level": "Demand Surge Tier",
+            "price_multiplier": "Dynamic Multiplier",
+            "recommended_price": "Recommended Dynamic Rate (₹)"
         }), use_container_width=True, hide_index=True)
 
     # Model Benchmark Metrics
     if not model_metrics_df.empty:
         st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:1.05rem; margin:1.5rem 0 0.4rem;'>Machine Learning Model Evaluation Benchmark (Test Set: Last 120 Days)</p>", unsafe_allow_html=True)
         st.dataframe(model_metrics_df, use_container_width=True, hide_index=True)
-
-    # Dynamic Pricing Engine in INR
-    if not hotel_pricing_df.empty:
-        st.markdown(f"<p style='font-weight:700; color:#2E1B0A; font-size:1.05rem; margin:1.5rem 0 0.4rem;'>Dynamic Pricing Engine (Demand-Driven ADR Multipliers in INR ₹) — {html.escape(chosen_hotel)}</p>", unsafe_allow_html=True)
-        sample_pricing = hotel_pricing_df[hotel_pricing_df["hotel"] == chosen_hotel].head(7)
-        if not sample_pricing.empty:
-            st.dataframe(sample_pricing[["date", "demand_level", "base_adr", "price_multiplier", "recommended_price"]].rename(columns={
-                "date": "Stay Date",
-                "demand_level": "Demand Tier",
-                "base_adr": "Base Rate (₹)",
-                "price_multiplier": "Dynamic Multiplier",
-                "recommended_price": "Recommended Rate (₹)"
-            }), use_container_width=True, hide_index=True)
 
     # Explainability & Diagnostic Plots
     st.markdown("<p style='font-weight:700; color:#2E1B0A; font-size:1.05rem; margin:1.5rem 0 0.4rem;'>Model Explainability & 7-Day Ahead Forecast Validation</p>", unsafe_allow_html=True)
