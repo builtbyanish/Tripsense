@@ -1665,8 +1665,6 @@ if st.session_state.app_mode == "Trip":
                         place_id=p_id,
                     )
 
-                    dist_badge_markup = f'<span class="editorial-badge-pill badge-gold">{dist_from_prev:.1f} km from {html.escape(prev_stop_name)}</span>' if dist_from_prev > 0 else ""
-                    
                     # Destination Weather Condition & Meteorological Model Output
                     w_map = st.session_state.get("weather_data", {})
                     w_info = w_map.get(p_id) if isinstance(w_map, dict) else None
@@ -1683,19 +1681,9 @@ if st.session_state.app_mode == "Trip":
                             stop_weather = "Pleasant (26°C), Moderate Climate"
 
                     if is_severe_dest:
-                        weather_badge_markup = f"""
-                        <div style="display:inline-flex; align-items:center; gap:0.35rem; background:#FFF1F0; border:1.5px solid #FF4D4F; border-radius:999px; padding:3px 12px; font-size:0.82rem; font-weight:700; color:#CF1322;">
-                          {icons.get_icon("alert-triangle", size=14, color="#CF1322")}
-                          <span>{html.escape(stop_weather)}</span>
-                        </div>
-                        """
+                        weather_badge_markup = f'<div style="display:inline-flex; align-items:center; gap:0.35rem; background:#FFF1F0; border:1.5px solid #FF4D4F; border-radius:999px; padding:3px 12px; font-size:0.82rem; font-weight:700; color:#CF1322;">{icons.get_icon("alert-triangle", size=14, color="#CF1322")}<span>{html.escape(stop_weather)}</span></div>'
                     else:
-                        weather_badge_markup = f"""
-                        <div style="display:inline-flex; align-items:center; gap:0.35rem; background:#FFFDF8; border:1px solid #D4B37C; border-radius:999px; padding:3px 12px; font-size:0.82rem; font-weight:600; color:#8C5A20;">
-                          {icons.get_icon("sun", size=14, color="#C8963E")}
-                          <span>{html.escape(stop_weather)}</span>
-                        </div>
-                        """
+                        weather_badge_markup = f'<div style="display:inline-flex; align-items:center; gap:0.35rem; background:#FFFDF8; border:1px solid #D4B37C; border-radius:999px; padding:3px 12px; font-size:0.82rem; font-weight:600; color:#8C5A20;">{icons.get_icon("sun", size=14, color="#C8963E")}<span>{html.escape(stop_weather)}</span></div>'
 
                     c_img, c_info = st.columns([1.2, 2.2])
                     with c_img:
@@ -1703,22 +1691,19 @@ if st.session_state.app_mode == "Trip":
                             st.image(photos[0]["url"], caption=photos[0].get("title", p_name), use_container_width=True)
 
                     with c_info:
-                        st.markdown(f"""
-                        <div style="padding:0.25rem 0;">
-                          <div style="display:flex; gap:0.5rem; margin-bottom:0.45rem; flex-wrap:wrap; align-items:center;">
-                            <span class="editorial-badge-pill badge-gold">{html.escape(str(p_cat).replace('_',' ').title())}</span>
-                            <span class="editorial-badge-pill badge-soft">{p_dur:g}h Duration</span>
-                            {weather_badge_markup}
-                            {dist_badge_markup}
-                          </div>
-                          <h3 style="font-family:'Outfit', sans-serif !important; font-size:1.4rem; margin:0 0 0.35rem; font-weight:800; color:#2E1B0A;">{idx+1}. {html.escape(p_name)}</h3>
-                          <p style="color:#8C5A20; font-weight:600; font-size:0.88rem; margin-bottom:0.5rem;">District: {html.escape(p_dist)}</p>
-                          <p style="color:#382613; font-size:0.92rem; line-height:1.5; margin-bottom:0.6rem;">{html.escape(p_desc or 'Authentic landmark and scenic attraction in Andhra Pradesh.')}</p>
-                          <div style="background:#FAF2E4; border:1.5px solid #D4B37C; border-left:4px solid #C8963E; padding:0.75rem 1rem; border-radius:0 12px 12px 0; font-size:0.88rem; color:#2E1B0A;">
-                            <strong style="color:#8C5A20;">Why this place:</strong> {html.escape(p_reas)}
-                          </div>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        st.markdown(f"""<div style="padding:0.25rem 0;">
+<div style="display:flex; gap:0.5rem; margin-bottom:0.45rem; flex-wrap:wrap; align-items:center;">
+<span class="editorial-badge-pill badge-gold">{html.escape(str(p_cat).replace('_',' ').title())}</span>
+<span class="editorial-badge-pill badge-soft">{p_dur:g}h Duration</span>
+{weather_badge_markup}
+</div>
+<h3 style="font-family:'Outfit', sans-serif !important; font-size:1.4rem; margin:0 0 0.35rem; font-weight:800; color:#2E1B0A;">{idx+1}. {html.escape(p_name)}</h3>
+<p style="color:#8C5A20; font-weight:600; font-size:0.88rem; margin-bottom:0.5rem;">District: {html.escape(p_dist)}</p>
+<p style="color:#382613; font-size:0.92rem; line-height:1.5; margin-bottom:0.6rem;">{html.escape(p_desc or 'Authentic landmark and scenic attraction in Andhra Pradesh.')}</p>
+<div style="background:#FAF2E4; border:1.5px solid #D4B37C; border-left:4px solid #C8963E; padding:0.75rem 1rem; border-radius:0 12px 12px 0; font-size:0.88rem; color:#2E1B0A;">
+<strong style="color:#8C5A20;">Why this place:</strong> {html.escape(p_reas)}
+</div>
+</div>""", unsafe_allow_html=True)
                     st.markdown("<hr style='margin:1rem 0; border:none; border-top:1.5px solid #EADBCC;'>", unsafe_allow_html=True)
 
                 # Recommended overnight accommodation for this day's destinations
