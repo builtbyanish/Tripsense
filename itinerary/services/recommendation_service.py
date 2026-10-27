@@ -260,6 +260,65 @@ def _filter_positive_scores(recs: pd.DataFrame) -> pd.DataFrame:
                 return pos
     return recs
 
+def _deduplicate_places(recs: pd.DataFrame) -> pd.DataFrame:
+    """
+    Deduplicate by place_id, canonical normalized name + district,
+    and close geographic proximity (< 350m apart with matching category/name).
+    Prevents duplicate entries (e.g. 'Kali Temple' and 'Kali Temple, Visakhapatnam').
+    """
+    if recs.empty:
+        return recs
+
+    def _c_key(name: str, district: str) -> str:
+        n = str(name).lower()
+        d = str(district).lower()
+        n = n.replace(d, "")
+        n = re.sub(r"[,.\-_/()']", " ", n)
+        n = re.sub(r"\b(temple|swamy|devasthanam|mandir|beach|fort|falls|waterfall|museum|monument|site|archaeological|hills|hill|viewpoint|park)\b", " ", n)
+        words = [w for w in n.split() if len(w) > 2]
+        return " ".join(sorted(words)) + "__" + d
+
+    seen_ids = set()
+    seen_keys = set()
+    keep_indices = []
+    accepted_coords = []
+
+    for idx, row in recs.iterrows():
+        pid = str(row.get("place_id", ""))
+        name = str(row.get("name", ""))
+        dist = str(row.get("district", ""))
+        cat = str(row.get("category", "")).lower()
+        lat = row.get("latitude")
+        lon = row.get("longitude")
+
+        if not pid or pid in seen_ids:
+            continue
+
+        ck = _c_key(name, dist)
+        if ck and ck in seen_keys:
+            continue
+
+        is_dup = False
+        if pd.notna(lat) and pd.notna(lon):
+            f_lat, f_lon = float(lat), float(lon)
+            for a_lat, a_lon, a_cat, a_name in accepted_coords:
+                d_km = _haversine_km(f_lat, f_lon, a_lat, a_lon)
+                if d_km < 0.35:
+                    if cat == a_cat or any(token in a_name for token in name.lower().split() if len(token) > 3):
+                        is_dup = True
+                        break
+        if is_dup:
+            continue
+
+        seen_ids.add(pid)
+        if ck:
+            seen_keys.add(ck)
+        if pd.notna(lat) and pd.notna(lon):
+            accepted_coords.append((float(lat), float(lon), cat, name.lower()))
+        keep_indices.append(idx)
+
+    return recs.loc[keep_indices].reset_index(drop=True)
+
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -332,7 +391,7 @@ def get_recommendations(
             if recs.empty:
                 log.info("Pipeline returned no results after filtering; falling back to content-based.")
             else:
-                return recs.drop_duplicates("place_id").head(top_n).reset_index(drop=True)
+                return _deduplicate_places(recs).head(top_n).reset_index(drop=True)
         except Exception as exc:
             log.warning("RecommendationPipeline failed (%s); falling back to ContentBasedRecommender.", exc)
 
@@ -364,7 +423,7 @@ def get_recommendations(
                     + interests[:40]
                     + "."
                 )
-            return recs.drop_duplicates("place_id").reset_index(drop=True)
+            return _deduplicate_places(recs).head(top_n).reset_index(drop=True)
         except Exception as exc:
             log.error("ContentBasedRecommender also failed: %s", exc)
 

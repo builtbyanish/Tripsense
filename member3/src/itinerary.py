@@ -277,14 +277,54 @@ def build_itinerary(
     # --- Convert recs to list of dicts for scheduling ---
     place_list: list[dict] = _recs_to_place_list(recommendations, weather_data)
 
-    # --- Deduplicate ---
+    # --- Deduplicate by Place ID, Canonical Name, and Proximity ---
+    def _canonical_name_key(name: str, district: str) -> str:
+        n = str(name).lower()
+        d = str(district).lower()
+        n = n.replace(d, "")
+        n = re.sub(r"[,.\-_/()']", " ", n)
+        n = re.sub(r"\b(temple|swamy|devasthanam|mandir|beach|fort|falls|waterfall|museum|monument|site|archaeological|hills|hill|viewpoint|park)\b", " ", n)
+        words = [w for w in n.split() if len(w) > 2]
+        return " ".join(sorted(words)) + "__" + d
+
     seen_ids: set[str] = set()
+    seen_keys: set[str] = set()
     unique_places: list[dict] = []
+    accepted_coords: list[tuple] = []
+
     for p in place_list:
         pid = str(p.get("place_id", ""))
-        if pid and pid not in seen_ids:
-            seen_ids.add(pid)
-            unique_places.append(p)
+        p_name = str(p.get("name", ""))
+        p_dist = str(p.get("district", ""))
+        p_cat = str(p.get("category", "")).lower()
+        p_lat = p.get("latitude")
+        p_lon = p.get("longitude")
+
+        if not pid or pid in seen_ids:
+            continue
+
+        c_key = _canonical_name_key(p_name, p_dist)
+        if c_key and c_key in seen_keys:
+            continue
+
+        is_dup_loc = False
+        if p_lat is not None and p_lon is not None:
+            f_lat, f_lon = float(p_lat), float(p_lon)
+            for a_lat, a_lon, a_cat, a_name in accepted_coords:
+                dist_km = _haversine_km(f_lat, f_lon, a_lat, a_lon)
+                if dist_km < 0.35:
+                    if p_cat == a_cat or any(token in a_name for token in p_name.lower().split() if len(token) > 3):
+                        is_dup_loc = True
+                        break
+        if is_dup_loc:
+            continue
+
+        seen_ids.add(pid)
+        if c_key:
+            seen_keys.add(c_key)
+        if p_lat is not None and p_lon is not None:
+            accepted_coords.append((float(p_lat), float(p_lon), p_cat, p_name.lower()))
+        unique_places.append(p)
 
     # Filter out steep high-terrain climbing destinations if seniors (60+) or kids (<10) are traveling
     if has_seniors or has_kids:
