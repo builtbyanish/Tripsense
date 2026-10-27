@@ -165,6 +165,8 @@ class ItineraryStop:
     cumulative_hrs:        float = 0.0
     tags:                  str = ""
     suitable_for:          str = ""
+    best_months:           str = ""
+    best_time:             str = ""
 
 
 @dataclass
@@ -476,6 +478,8 @@ def build_itinerary(
                 cumulative_hrs=round(cumul, 2),
                 tags=str(p.get("tags_text", "")),
                 suitable_for=str(p.get("suitable_for", "")),
+                best_months=str(p.get("best_months", "")),
+                best_time=str(p.get("best_time", "")),
             )
             day.stops.append(stop)
 

@@ -63,7 +63,7 @@ except ImportError:
 _PLACE_COLS = [
     "place_id", "name", "category", "district",
     "latitude", "longitude", "description", "tags_text",
-    "suitable_for", "visit_duration_hrs", "best_months",
+    "suitable_for", "visit_duration_hrs", "best_months", "best_time",
     "avg_temp_c", "annual_rain_mm",
 ]
 

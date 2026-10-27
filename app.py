@@ -1108,7 +1108,7 @@ if not st.session_state.get("has_shown_welcome_splash", False):
 # Data Loading & Caching
 # ---------------------------------------------------------------------------
 @st.cache_data
-def _load_all_data_v3():
+def _load_all_data_v4():
     p_df = data_service.load_places()
     h_df = data_service.load_hotels()
     w_df = data_service.load_weather()
@@ -1144,7 +1144,7 @@ def _load_all_data_v3():
 
     return p_df, h_df, w_df, bm_df, ri_df, i_df, hr_df, fc_df, met_df, pr_df, pld_df
 
-places_df, hotels_df, weather_df, best_months_df, review_insights_df, interactions_df, hotel_reviews_df, demand_forecast_df, model_metrics_df, hotel_pricing_df, places_hotel_demand_df = _load_all_data_v3()
+places_df, hotels_df, weather_df, best_months_df, review_insights_df, interactions_df, hotel_reviews_df, demand_forecast_df, model_metrics_df, hotel_pricing_df, places_hotel_demand_df = _load_all_data_v4()
 
 # Pre-load Wikipedia Image Manifest
 wikipedia_images.load_manifest()
@@ -1777,6 +1777,10 @@ if st.session_state.app_mode == "Trip":
         # Best Travel Dates & Climate Advisory Card
         date_notes_text = getattr(itin, "date_notes", "")
         best_months_list = getattr(itin, "best_months", [])
+        if not best_months_list:
+            itin_pids = [getattr(s, "place_id", "") for d in itin.days for s in d.stops if getattr(s, "place_id", "")]
+            if itin_pids and not best_months_df.empty:
+                best_months_list = date_service.suggest_best_months_for_places(itin_pids, best_months_df, top_n=3)
         if date_notes_text or best_months_list:
             opt_months_markup = ""
             if best_months_list:
@@ -1916,6 +1920,27 @@ if st.session_state.app_mode == "Trip":
                     else:
                         weather_badge_markup = f'<div style="display:inline-flex; align-items:center; gap:0.35rem; background:#FFFDF8; border:1px solid #D4B37C; border-radius:999px; padding:3px 12px; font-size:0.82rem; font-weight:600; color:#8C5A20;">{icons.get_icon("sun", size=14, color="#C8963E")}<span>{html.escape(stop_weather)}</span></div>'
 
+                    # Look up place-specific authentic best_months, best_time, and duration
+                    p_match = places_df[places_df["place_id"].astype(str) == str(p_id)]
+                    if not p_match.empty:
+                        p_row_data = p_match.iloc[0]
+                        p_best_months = str(p_row_data.get("best_months") or getattr(stop, "best_months", "Oct, Nov, Dec, Jan, Feb"))
+                        p_best_time = str(p_row_data.get("best_time") or getattr(stop, "best_time", "8:30 AM – 11:30 AM & 3:30 PM – 5:30 PM"))
+                        p_dur = float(p_row_data.get("visit_duration_hrs", p_dur))
+                    else:
+                        p_best_months = str(getattr(stop, "best_months", "Oct, Nov, Dec, Jan, Feb") or "Oct, Nov, Dec, Jan, Feb")
+                        p_best_time = str(getattr(stop, "best_time", "8:30 AM – 11:30 AM & 3:30 PM – 5:30 PM") or "8:30 AM – 11:30 AM & 3:30 PM – 5:30 PM")
+
+                    # Clean up redundant boilerplate in p_reas
+                    clean_reas = p_reas
+                    import re as _re_clean
+                    clean_reas = _re_clean.sub(r"about \d+(\.\d+)? hours to visit\.?\s*", "", clean_reas, flags=_re_clean.IGNORECASE)
+                    clean_reas = _re_clean.sub(r"Best months:.*$", "", clean_reas, flags=_re_clean.IGNORECASE).strip()
+                    if clean_reas.endswith(","):
+                        clean_reas = clean_reas[:-1].strip() + "."
+                    if not clean_reas:
+                        clean_reas = f"Selected because it offers a premier {str(p_cat).replace('_', ' ')} experience in {p_dist}."
+
                     c_img, c_info = st.columns([1.2, 2.2])
                     with c_img:
                         if photos:
@@ -1923,16 +1948,22 @@ if st.session_state.app_mode == "Trip":
 
                     with c_info:
                         st.markdown(f"""<div style="padding:0.25rem 0;">
-<div style="display:flex; gap:0.5rem; margin-bottom:0.45rem; flex-wrap:wrap; align-items:center;">
+<div style="display:flex; gap:0.4rem; margin-bottom:0.45rem; flex-wrap:wrap; align-items:center;">
 <span class="editorial-badge-pill badge-gold">{html.escape(str(p_cat).replace('_',' ').title())}</span>
 <span class="editorial-badge-pill badge-soft">{p_dur:g}h Duration</span>
+<span class="editorial-badge-pill badge-soft" style="color:#6B420C; background:#FAF2E4; border:1px solid #D4B37C; font-size:0.8rem;">
+  {icons.get_icon("clock", size=13, color="#8C5A20")} Best Time: {html.escape(p_best_time)}
+</span>
+<span class="editorial-badge-pill badge-gold" style="color:#8C5A20; background:rgba(200,150,62,0.12); font-size:0.8rem;">
+  {icons.get_icon("calendar", size=13, color="#C8963E")} Best Season: {html.escape(p_best_months)}
+</span>
 {weather_badge_markup}
 </div>
 <h3 style="font-family:'Outfit', sans-serif !important; font-size:1.4rem; margin:0 0 0.35rem; font-weight:800; color:#2E1B0A;">{idx+1}. {html.escape(p_name)}</h3>
 <p style="color:#8C5A20; font-weight:600; font-size:0.88rem; margin-bottom:0.5rem;">District: {html.escape(p_dist)}</p>
 <p style="color:#382613; font-size:0.92rem; line-height:1.5; margin-bottom:0.6rem;">{html.escape(p_desc or 'Authentic landmark and scenic attraction in Andhra Pradesh.')}</p>
 <div style="background:#FAF2E4; border:1.5px solid #D4B37C; border-left:4px solid #C8963E; padding:0.75rem 1rem; border-radius:0 12px 12px 0; font-size:0.88rem; color:#2E1B0A;">
-<strong style="color:#8C5A20;">Why this place:</strong> {html.escape(p_reas)}
+<strong style="color:#8C5A20;">Why this place:</strong> {html.escape(clean_reas)}
 </div>
 </div>""", unsafe_allow_html=True)
                     st.markdown("<hr style='margin:1rem 0; border:none; border-top:1.5px solid #EADBCC;'>", unsafe_allow_html=True)
