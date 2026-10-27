@@ -1167,16 +1167,16 @@ _INTEREST_OPTIONS = [
 ]
 
 _INTEREST_KEYWORD_MAP = {
-    "Temples & Spirituality": "temple spiritual religious pilgrimage sacred",
-    "Beaches & Coastlines": "beach coastal sea ocean shore waves",
-    "Hill Stations & Valleys": "hill mountain valley scenic viewpoints clouds",
-    "Waterfalls & Streams": "waterfall falls cascade plunge stream",
-    "Wildlife & Nature Reserves": "wildlife sanctuary forest nature reserve park",
-    "Heritage & Forts": "fort heritage history ancient palace architecture",
-    "Caves & Rock Formations": "cave cavern rock stalactite geology",
-    "Lakes & River Gorges": "lake dam reservoir river gorge water",
-    "Adventure & Trekking": "adventure trekking climbing hiking outdoors",
-    "Culture & Museums": "museum culture art archaeological gallery",
+    "Temples & Spirituality": "temple spiritual religious pilgrimage sacred darshan mandir shrine devasthanam",
+    "Beaches & Coastlines": "beach coastal sea ocean shore waves sands seaside coast bay",
+    "Hill Stations & Valleys": "hill_station hill mountain valley scenic viewpoints clouds ghats araku lambasingi horsley kailasagiri",
+    "Waterfalls & Streams": "waterfall falls cascade plunge stream rapids talakona katiki chaparai duduma",
+    "Wildlife & Nature Reserves": "wildlife sanctuary forest nature reserve park safari animals flora fauna",
+    "Heritage & Forts": "fort heritage history ancient palace architecture historic dynasty archaeological ruins",
+    "Caves & Rock Formations": "caves cave cavern rock stalactite geology subterranean belum borra undavalli",
+    "Lakes & River Gorges": "lake dam reservoir river gorge water boating reservoir papikondalu bhavani island",
+    "Adventure & Trekking": "adventure trekking climbing hiking outdoors trail exploration rugged camp",
+    "Culture & Museums": "museum culture art archaeological gallery tribal handicrafts heritage traditions",
 }
 
 _TRAVELER_SUITABLE_MAP = {
@@ -1250,12 +1250,17 @@ with st.expander("Plan Your Trip", expanded=True):
         )
 
     with s_col2:
+        default_interests = st.session_state.get("plan_interests", ["Hill Stations & Valleys"])
+        default_interests = [i for i in default_interests if i in _INTEREST_OPTIONS] or ["Hill Stations & Valleys"]
         interests_selected = st.multiselect(
-            "Interests",
+            "Interests (Pick Multiple)",
             _INTEREST_OPTIONS,
-            default=["Temples & Spirituality", "Nature & Forests"] if "Nature & Forests" in _INTEREST_OPTIONS else ["Temples & Spirituality"],
-            help="Choose your travel themes to guide recommendations.",
+            default=default_interests,
+            help="Choose one or more travel themes to guide recommendations.",
+            placeholder="Select themes (e.g. Hill Stations, Waterfalls)",
+            key="plan_interests_multiselect"
         )
+        st.session_state.plan_interests = interests_selected
 
     today = date.today()
     with s_col3:
@@ -1370,6 +1375,25 @@ with st.expander("Plan Your Trip", expanded=True):
             if has_seniors or has_kids:
                 st.info("Gentle Terrain Active: High climbs, steep waterfalls, caves, and rugged trails will be filtered out for seniors (60+) / kids (<10).")
 
+    # Display chosen interests chips inside Plan Your Trip box
+    if interests_selected:
+        pills_html = "".join(
+            f'<span style="background: rgba(200, 150, 62, 0.15); color: #8C5A20; border: 1px solid rgba(200, 150, 62, 0.4); padding: 3px 10px; border-radius: 12px; font-size: 0.82rem; font-weight: 600; margin-right: 6px; display: inline-block; margin-top: 4px;">{i}</span>'
+            for i in interests_selected
+        )
+        st.markdown(f'''
+        <div style="margin: 0.5rem 0 0.85rem; padding: 0.55rem 0.85rem; background: #FFFDF9; border: 1px solid #EAE0D5; border-radius: 8px;">
+          <span style="font-size: 0.84rem; font-weight: 700; color: #382613; margin-right: 8px;">Active Selected Themes ({len(interests_selected)}):</span>
+          {pills_html}
+        </div>
+        ''', unsafe_allow_html=True)
+    else:
+        st.markdown('''
+        <div style="margin: 0.5rem 0 0.85rem; padding: 0.55rem 0.85rem; background: #FFFDF9; border: 1px solid #EAE0D5; border-radius: 8px; font-size: 0.84rem; color: #8C5A20;">
+          <span style="font-weight: 700;">No theme selected:</span> Exploring balanced scenic highlights across all categories.
+        </div>
+        ''', unsafe_allow_html=True)
+
     _, btn_mid, _ = st.columns([1, 1.6, 1])
     with btn_mid:
         search_submitted = st.button("Explore & Plan Journey", type="primary", use_container_width=True)
@@ -1413,9 +1437,12 @@ st.markdown("""
 # Pipeline Execution on Search Submit
 # ---------------------------------------------------------------------------
 if search_submitted:
-    interest_keywords = " ".join(
-        _INTEREST_KEYWORD_MAP.get(i, i.lower()) for i in (interests_selected or ["Temples & Spirituality"])
-    )
+    if interests_selected:
+        interest_keywords = " ".join(
+            _INTEREST_KEYWORD_MAP.get(i, i.lower()) for i in interests_selected
+        )
+    else:
+        interest_keywords = "scenic tourist destination hill_station beach heritage nature waterfall" 
     district_filter = None if district == "All Andhra Pradesh" else district
     suitable_filter = _TRAVELER_SUITABLE_MAP.get(traveler_type, None)
 

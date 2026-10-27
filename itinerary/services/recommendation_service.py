@@ -224,6 +224,42 @@ def _filter_by_suitable(
 
 
 # ---------------------------------------------------------------------------
+def _filter_non_requested_temples(recs: pd.DataFrame, interests: str) -> pd.DataFrame:
+    """
+    If the traveler did not specifically request spiritual/temple themes,
+    deprioritize/remove pure temples so they do not crowd out hill stations,
+    beaches, waterfalls, forts, or nature reserves.
+    """
+    if recs.empty:
+        return recs
+
+    wants_temple = any(
+        w in str(interests).lower()
+        for w in ["temple", "spiritual", "pilgrimage", "religious", "darshan", "sacred", "mandir", "shrine", "devasthanam"]
+    )
+    if wants_temple:
+        return recs
+
+    cat_col = recs["category"].astype(str).str.lower() if "category" in recs.columns else pd.Series("", index=recs.index)
+    name_col = recs["name"].astype(str).str.lower() if "name" in recs.columns else pd.Series("", index=recs.index)
+    is_temple = (cat_col == "temple") | name_col.str.contains(r"\btemple\b|\bmandir\b|\bshrine\b|darshan|swamy vaari", regex=True)
+
+    non_temples = recs[~is_temple]
+    if not non_temples.empty:
+        return non_temples
+    return recs
+
+
+def _filter_positive_scores(recs: pd.DataFrame) -> pd.DataFrame:
+    if recs.empty:
+        return recs
+    for col in ["final_score", "content_score"]:
+        if col in recs.columns:
+            pos = recs[recs[col] > 0.0001]
+            if not pos.empty:
+                return pos
+    return recs
+
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -270,7 +306,7 @@ def get_recommendations(
     # Determine how many places to retrieve initially from recommendation pipeline
     # If a district filter is applied, request all places so district-specific attractions
     # are never starved by global top_n, then filter and take top_n
-    pipeline_top_n = len(places_df) if district and district.lower() not in ("all", "all andhra pradesh", "") else max(top_n, 40)
+    pipeline_top_n = len(places_df)
 
     # ---- Use full pipeline if available ----
     if _PIPELINE_AVAILABLE:
@@ -291,6 +327,8 @@ def get_recommendations(
                 has_seniors=has_seniors,
                 has_kids=has_kids,
             )
+            recs = _filter_non_requested_temples(recs, interests)
+            recs = _filter_positive_scores(recs)
             if recs.empty:
                 log.info("Pipeline returned no results after filtering; falling back to content-based.")
             else:
@@ -315,6 +353,8 @@ def get_recommendations(
                 has_seniors=has_seniors,
                 has_kids=has_kids,
             )
+            recs = _filter_non_requested_temples(recs, interests)
+            recs = _filter_positive_scores(recs)
             if "recommendation_method" not in recs.columns:
                 recs["recommendation_method"] = "content-based"
             if "recommendation_reason" not in recs.columns:
