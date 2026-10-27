@@ -19,6 +19,8 @@ Design decisions
 from __future__ import annotations
 
 import logging
+import math
+import re
 import sys
 from pathlib import Path
 from typing import Optional
